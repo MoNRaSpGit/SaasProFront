@@ -36,25 +36,33 @@ export function LoginPage() {
 
   const onSubmit = async (values: LoginFormValues) => {
     setApiError(null);
+    setLoggedUser(null);
 
-    const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(values)
-    });
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values)
+      });
 
-    const payload = (await response.json()) as LoginResponse | { message?: string };
-    if (!response.ok) {
-      const message = "message" in payload && payload.message ? payload.message : "Error al iniciar sesion";
-      setApiError(message);
-      return;
+      const payload = (await response.json()) as LoginResponse | { message?: string | string[] };
+      if (!response.ok) {
+        const rawMessage = "message" in payload ? payload.message : null;
+        const message = Array.isArray(rawMessage)
+          ? rawMessage.join(", ")
+          : rawMessage || "Error al iniciar sesion";
+        setApiError(message);
+        return;
+      }
+
+      const data = payload as LoginResponse;
+      localStorage.setItem("saaspro_access_token", data.tokens.accessToken);
+      localStorage.setItem("saaspro_refresh_token", data.tokens.refreshToken);
+      localStorage.setItem("saaspro_user", JSON.stringify(data.user));
+      setLoggedUser(data.user);
+    } catch {
+      setApiError("No se pudo conectar al backend. Revisar CORS/URL/API.");
     }
-
-    const data = payload as LoginResponse;
-    localStorage.setItem("saaspro_access_token", data.tokens.accessToken);
-    localStorage.setItem("saaspro_refresh_token", data.tokens.refreshToken);
-    localStorage.setItem("saaspro_user", JSON.stringify(data.user));
-    setLoggedUser(data.user);
   };
 
   return (
