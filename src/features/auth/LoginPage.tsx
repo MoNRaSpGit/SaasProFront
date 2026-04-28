@@ -1,30 +1,20 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { useNavigate } from "react-router-dom";
+import { saveSession } from "./auth.client";
+import { AuthSession } from "./auth.types";
 
 type LoginFormValues = {
   email: string;
   password: string;
 };
 
-type LoginResponse = {
-  user: {
-    id: number;
-    email: string;
-    fullName: string | null;
-    role: string;
-  };
-  tokens: {
-    accessToken: string;
-    refreshToken: string;
-    tokenType: string;
-    accessTtl: string;
-    refreshTtl: string;
-  };
-};
+type LoginResponse = AuthSession;
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://saasproback.onrender.com";
 
 export function LoginPage() {
+  const navigate = useNavigate();
   const [apiError, setApiError] = useState<string | null>(null);
   const [loggedUser, setLoggedUser] = useState<LoginResponse["user"] | null>(null);
   const {
@@ -56,10 +46,9 @@ export function LoginPage() {
       }
 
       const data = payload as LoginResponse;
-      localStorage.setItem("saaspro_access_token", data.tokens.accessToken);
-      localStorage.setItem("saaspro_refresh_token", data.tokens.refreshToken);
-      localStorage.setItem("saaspro_user", JSON.stringify(data.user));
+      saveSession(data);
       setLoggedUser(data.user);
+      navigate("/dashboard");
     } catch {
       setApiError("No se pudo conectar al backend. Revisar CORS/URL/API.");
     }

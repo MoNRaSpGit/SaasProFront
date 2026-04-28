@@ -1,5 +1,7 @@
 import { Link, Route, Routes } from "react-router-dom";
+import { DashboardPage } from "../features/auth/DashboardPage";
 import { LoginPage } from "../features/auth/LoginPage";
+import { ProtectedRoute } from "../features/auth/ProtectedRoute";
 
 function HomePage() {
   return (
@@ -8,6 +10,9 @@ function HomePage() {
       <p>Scaffold base listo para iniciar el MVP de almacen.</p>
       <p>
         <Link to="/login">Ir a login</Link>
+      </p>
+      <p>
+        <Link to="/dashboard">Ir a dashboard (privada)</Link>
       </p>
       <Link to="/health">Ir a health page</Link>
     </main>
@@ -27,6 +32,14 @@ export function App() {
     <Routes>
       <Route path="/" element={<HomePage />} />
       <Route path="/login" element={<LoginPage />} />
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute>
+            <DashboardPage />
+          </ProtectedRoute>
+        }
+      />
       <Route path="/health" element={<HealthPage />} />
     </Routes>
   );
