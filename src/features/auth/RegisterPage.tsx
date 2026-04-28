@@ -4,50 +4,48 @@ import { Link, useNavigate } from "react-router-dom";
 import { saveSession } from "./auth.client";
 import { AuthSession } from "./auth.types";
 
-type LoginFormValues = {
+type RegisterFormValues = {
+  fullName: string;
   email: string;
   password: string;
 };
 
-type LoginResponse = AuthSession;
-
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://saasproback.onrender.com";
 
-export function LoginPage() {
+export function RegisterPage() {
   const navigate = useNavigate();
   const [apiError, setApiError] = useState<string | null>(null);
-  const [loggedUser, setLoggedUser] = useState<LoginResponse["user"] | null>(null);
   const {
     register,
     handleSubmit,
-    setValue,
     formState: { errors, isSubmitting }
-  } = useForm<LoginFormValues>();
+  } = useForm<RegisterFormValues>();
 
-  const onSubmit = async (values: LoginFormValues) => {
+  const onSubmit = async (values: RegisterFormValues) => {
     setApiError(null);
-    setLoggedUser(null);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values)
+        body: JSON.stringify({
+          fullName: values.fullName,
+          email: values.email,
+          password: values.password
+        })
       });
 
-      const payload = (await response.json()) as LoginResponse | { message?: string | string[] };
+      const payload = (await response.json()) as AuthSession | { message?: string | string[] };
       if (!response.ok) {
         const rawMessage = "message" in payload ? payload.message : null;
         const message = Array.isArray(rawMessage)
           ? rawMessage.join(", ")
-          : rawMessage || "Error al iniciar sesion";
+          : rawMessage || "Error al registrar usuario";
         setApiError(message);
         return;
       }
 
-      const data = payload as LoginResponse;
-      saveSession(data);
-      setLoggedUser(data.user);
+      saveSession(payload as AuthSession);
       navigate("/dashboard");
     } catch {
       setApiError("No se pudo conectar al backend. Revisar CORS/URL/API.");
@@ -56,20 +54,21 @@ export function LoginPage() {
 
   return (
     <main style={{ maxWidth: 420, margin: "48px auto", fontFamily: "system-ui, sans-serif", padding: "0 16px" }}>
-      <h1 style={{ marginBottom: 8 }}>Login</h1>
-      <p style={{ marginTop: 0, color: "#555" }}>Ingresa con tu email y password del backend.</p>
-      <button
-        type="button"
-        onClick={() => {
-          setValue("email", "juan@saaspro.com");
-          setValue("password", "12345");
-        }}
-        style={{ marginBottom: 12, padding: "8px 10px" }}
-      >
-        Usar credenciales demo (juan / 12345)
-      </button>
+      <h1 style={{ marginBottom: 8 }}>Registro</h1>
+      <p style={{ marginTop: 0, color: "#555" }}>Crea tu usuario y entra directo al dashboard.</p>
 
       <form onSubmit={handleSubmit(onSubmit)} style={{ display: "grid", gap: 12 }}>
+        <label>
+          Nombre
+          <input
+            type="text"
+            placeholder="Juan Perez"
+            style={{ width: "100%", padding: 10, marginTop: 4 }}
+            {...register("fullName", { required: "Nombre requerido" })}
+          />
+        </label>
+        {errors.fullName ? <small style={{ color: "crimson" }}>{errors.fullName.message}</small> : null}
+
         <label>
           Email
           <input
@@ -87,20 +86,19 @@ export function LoginPage() {
             type="password"
             placeholder="********"
             style={{ width: "100%", padding: 10, marginTop: 4 }}
-            {...register("password", { required: "Password requerido" })}
+            {...register("password", { required: "Password requerido", minLength: 5 })}
           />
         </label>
-        {errors.password ? <small style={{ color: "crimson" }}>{errors.password.message}</small> : null}
+        {errors.password ? <small style={{ color: "crimson" }}>Password minimo 5 caracteres</small> : null}
 
         <button type="submit" disabled={isSubmitting} style={{ padding: 12, fontWeight: 600 }}>
-          {isSubmitting ? "Entrando..." : "Iniciar sesion"}
+          {isSubmitting ? "Creando..." : "Crear cuenta"}
         </button>
       </form>
 
       {apiError ? <p style={{ color: "crimson", marginTop: 12 }}>{apiError}</p> : null}
-      {loggedUser ? <p style={{ color: "green", marginTop: 12 }}>Login OK: {loggedUser.email}</p> : null}
       <p style={{ marginTop: 12 }}>
-        No tenes cuenta? <Link to="/register">Crear cuenta</Link>
+        Ya tenes cuenta? <Link to="/login">Ir a login</Link>
       </p>
     </main>
   );
