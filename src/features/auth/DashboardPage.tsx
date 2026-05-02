@@ -9,6 +9,7 @@ export function DashboardPage() {
   const [status, setStatus] = useState<string | null>(null);
   const user = useMemo(() => getStoredUser(), []);
   const modules = getEnabledModules(user);
+  const hasModules = modules.length > 0;
   const handleRefresh = async () => {
     setStatus("Renovando token...");
     const tokens = await refreshSession();
@@ -34,11 +35,27 @@ export function DashboardPage() {
         Modulos activos: <strong>{modules.join(", ") || "Ninguno"}</strong>
       </p>
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-        {modules.includes("pos") ? <Link to="/pos">Abrir POS</Link> : null}
-        {modules.includes("camiones") ? <Link to="/camiones">Abrir Camiones</Link> : null}
-        {modules.includes("distribuidora") ? <Link to="/distribuidora">Abrir Distribuidora</Link> : null}
-      </div>
+      {hasModules ? (
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+          {modules.includes("pos") ? <Link to="/pos">Abrir POS</Link> : null}
+          {modules.includes("camiones") ? <Link to="/camiones">Abrir Camiones</Link> : null}
+          {modules.includes("distribuidora") ? <Link to="/distribuidora">Abrir Distribuidora</Link> : null}
+        </div>
+      ) : (
+        <section
+          style={{
+            marginBottom: 16,
+            padding: "14px 16px",
+            borderRadius: 16,
+            background: "#fff7e8",
+            border: "1px solid #eed7a6",
+            color: "#6e5320"
+          }}
+        >
+          Tu cuenta esta creada, pero todavia no tiene modulos habilitados. Cuando `SaasPro` active tus modelos,
+          van a aparecer aca.
+        </section>
+      )}
 
       <div style={{ display: "flex", gap: 8 }}>
         <button type="button" onClick={handleRefresh}>

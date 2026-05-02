@@ -28,13 +28,13 @@ function buildUser(modules: string[]): StoredAuthUser {
 }
 
 describe("frontend smoke", () => {
-  it("routes single-module users directly to that module", () => {
-    expect(getDefaultAuthenticatedRoute(buildUser(["camiones"]))).toBe("/camiones");
-    expect(getDefaultAuthenticatedRoute(buildUser(["pos"]))).toBe("/pos");
+  it("always routes authenticated users through the dashboard", () => {
+    expect(getDefaultAuthenticatedRoute(buildUser(["camiones"]))).toBe("/dashboard");
+    expect(getDefaultAuthenticatedRoute(buildUser(["pos"]))).toBe("/dashboard");
+    expect(getDefaultAuthenticatedRoute(buildUser(["camiones", "pos"]))).toBe("/dashboard");
   });
 
-  it("keeps dashboard as fallback for mixed or unknown contexts", () => {
-    expect(getDefaultAuthenticatedRoute(buildUser(["camiones", "pos"]))).toBe("/dashboard");
+  it("keeps dashboard as fallback for unknown contexts", () => {
     expect(getFirstAccessibleModuleRoute(buildUser(["unknown-module"]))).toBe("/dashboard");
   });
 

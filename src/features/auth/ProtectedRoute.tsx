@@ -24,7 +24,7 @@ export function ProtectedRoute({ children, requiredModule, requiredCapability }:
   const user = getStoredUser();
 
   if (requiredModule && !hasModuleAccess(user, requiredModule)) {
-    return <Navigate to={getFirstAccessibleModuleRoute(user)} replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   if (requiredCapability && !userHasCapability(user, requiredCapability)) {
