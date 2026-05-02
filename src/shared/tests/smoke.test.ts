@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getDefaultAuthenticatedRoute, getFirstAccessibleModuleRoute, hasModuleAccess } from "../../features/auth/module-routing";
+import { userHasCapability } from "../../features/auth/tenant-capabilities";
 import { StoredAuthUser } from "../../features/auth/auth.types";
 
 function buildUser(modules: string[]): StoredAuthUser {
@@ -40,5 +41,24 @@ describe("frontend smoke", () => {
     const user = buildUser(["distribuidora", "camiones"]);
     expect(hasModuleAccess(user, "camiones")).toBe(true);
     expect(hasModuleAccess(user, "pos")).toBe(false);
+  });
+
+  it("derives frontend capabilities from membership role", () => {
+    const adminUser = buildUser(["distribuidora"]);
+    const operarioUser = {
+      ...buildUser(["distribuidora"]),
+      tenantContext: {
+        ...buildUser(["distribuidora"]).tenantContext!,
+        membership: {
+          role: "operario",
+          status: "active",
+          isDefault: true
+        }
+      }
+    };
+
+    expect(userHasCapability(adminUser, "distribuidora.admin.read")).toBe(true);
+    expect(userHasCapability(operarioUser, "distribuidora.admin.read")).toBe(false);
+    expect(userHasCapability(operarioUser, "distribuidora.shell.read")).toBe(true);
   });
 });

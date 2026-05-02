@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { getStoredUser } from "../auth/auth.client";
+import { userHasCapability } from "../auth/tenant-capabilities";
 import { getDistribuidoraStatus } from "./distribuidora.client";
 import { DistribuidoraShellStatus } from "./distribuidora.types";
 
@@ -9,6 +10,7 @@ export function DistribuidoraHomePage() {
   const [status, setStatus] = useState<DistribuidoraShellStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const canViewAdmin = userHasCapability(user, "distribuidora.admin.read");
 
   useEffect(() => {
     let cancelled = false;
@@ -58,9 +60,11 @@ export function DistribuidoraHomePage() {
               <Link to="/dashboard" style={secondaryLinkStyle}>
                 Dashboard
               </Link>
-              <Link to="/distribuidora/admin" style={primaryLinkStyle}>
-                Vista admin
-              </Link>
+              {canViewAdmin ? (
+                <Link to="/distribuidora/admin" style={primaryLinkStyle}>
+                  Vista admin
+                </Link>
+              ) : null}
             </div>
           </div>
         </section>
@@ -101,7 +105,7 @@ export function DistribuidoraHomePage() {
                 <ul style={listStyle}>
                   <li>Acceso real por `tenant` y `tenant_modules`.</li>
                   <li>Ruta oficial protegida dentro del SaaS.</li>
-                  <li>Vista admin registrada para el modulo.</li>
+                  <li>Vista admin registrada y filtrada por capability.</li>
                   <li>Funcionalidad de pedidos todavia no integrada al backend.</li>
                 </ul>
               </div>

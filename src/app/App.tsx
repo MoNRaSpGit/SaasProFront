@@ -158,7 +158,7 @@ export function App() {
       <Route
         path="/distribuidora/admin"
         element={
-          <ProtectedRoute requiredModule="distribuidora">
+          <ProtectedRoute requiredModule="distribuidora" requiredCapability="distribuidora.admin.read">
             <DistribuidoraAdminPage />
           </ProtectedRoute>
         }
