@@ -1,5 +1,7 @@
 import { Link, Route, Routes } from "react-router-dom";
 import { DashboardPage } from "../features/auth/DashboardPage";
+import { DistribuidoraAdminPage } from "../features/distribuidora/DistribuidoraAdminPage";
+import { DistribuidoraHomePage } from "../features/distribuidora/DistribuidoraHomePage";
 import { LoginPage } from "../features/auth/LoginPage";
 import { ProtectedRoute } from "../features/auth/ProtectedRoute";
 import { RegisterPage } from "../features/auth/RegisterPage";
@@ -74,6 +76,22 @@ function HomePage() {
           </article>
 
           <article style={homeCardStyle}>
+            <p style={eyebrowStyle}>Modelo</p>
+            <h2 style={cardTitleStyle}>Distribuidora</h2>
+            <p style={cardBodyStyle}>
+              Pedido por cliente con productos mock, guardado en `localStorage` y vista admin simulada.
+            </p>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 14 }}>
+              <Link to="/distribuidora" style={cardLinkStyle}>
+                Abrir modelo
+              </Link>
+              <Link to="/distribuidora/admin" style={subtleLinkStyle}>
+                Ver admin
+              </Link>
+            </div>
+          </article>
+
+          <article style={homeCardStyle}>
             <p style={eyebrowStyle}>Estado</p>
             <h2 style={cardTitleStyle}>Health</h2>
             <p style={cardBodyStyle}>Chequeo simple del frontend para validar que la app esta levantando bien.</p>
@@ -114,6 +132,22 @@ export function App() {
         element={
           <ProtectedRoute>
             <PosHomePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/distribuidora"
+        element={
+          <ProtectedRoute>
+            <DistribuidoraHomePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/distribuidora/admin"
+        element={
+          <ProtectedRoute>
+            <DistribuidoraAdminPage />
           </ProtectedRoute>
         }
       />
@@ -168,5 +202,16 @@ const cardLinkStyle: React.CSSProperties = {
   textDecoration: "none",
   background: "#172433",
   color: "#f7fafc",
+  fontWeight: 700
+};
+
+const subtleLinkStyle: React.CSSProperties = {
+  display: "inline-flex",
+  marginTop: 14,
+  padding: "10px 14px",
+  borderRadius: 14,
+  textDecoration: "none",
+  background: "#eef4fa",
+  color: "#1f3953",
   fontWeight: 700
 };

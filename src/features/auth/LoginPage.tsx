@@ -54,6 +54,43 @@ export function LoginPage() {
     }
   };
 
+  const handleDistribuidoraDemoAccess = () => {
+    const demoSession: AuthSession = {
+      user: {
+        id: 999001,
+        email: "demo.distribuidora@saaspro.local",
+        fullName: "Demo Distribuidora",
+        role: "admin"
+      },
+      tenantContext: {
+        tenant: {
+          id: 999,
+          name: "Distribuidora Demo",
+          slug: "distribuidora-demo",
+          status: "active"
+        },
+        membership: {
+          role: "admin",
+          status: "active",
+          isDefault: true
+        },
+        modules: ["distribuidora"]
+      },
+      tokens: {
+        accessToken: "demo-distribuidora-access-token",
+        refreshToken: "demo-distribuidora-refresh-token",
+        tokenType: "Bearer",
+        accessTtl: "24h",
+        refreshTtl: "7d"
+      }
+    };
+
+    saveSession(demoSession);
+    setApiError(null);
+    setLoggedUser(demoSession.user);
+    navigate("/distribuidora");
+  };
+
   return (
     <main style={{ maxWidth: 420, margin: "48px auto", fontFamily: "system-ui, sans-serif", padding: "0 16px" }}>
       <h1 style={{ marginBottom: 8 }}>Login</h1>
@@ -67,6 +104,21 @@ export function LoginPage() {
         style={{ marginBottom: 12, padding: "8px 10px" }}
       >
         Usar credenciales demo (juan / 12345)
+      </button>
+      <button
+        type="button"
+        onClick={handleDistribuidoraDemoAccess}
+        style={{
+          marginBottom: 16,
+          marginLeft: 8,
+          padding: "8px 10px",
+          borderRadius: 10,
+          border: "1px solid #cfd7e1",
+          background: "#eef4fb",
+          fontWeight: 700
+        }}
+      >
+        Entrar demo Distribuidora
       </button>
 
       <form onSubmit={handleSubmit(onSubmit)} style={{ display: "grid", gap: 12 }}>

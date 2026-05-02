@@ -1,0 +1,23 @@
+.Toastify__toast-container {
+  width: min(360px, calc(100vw - 20px));
+  padding: 0 10px 10px 0;
+}
+
+.Toastify__toast-container--bottom-right {
+  right: 10px;
+  bottom: 10px;
+}
+
+.Toastify__toast {
+  border-radius: 16px;
+  font-size: 14px;
+  min-height: 0;
+  box-shadow: 0 14px 28px rgba(21, 34, 44, 0.14);
+}
+
+.Toastify__toast-body {
+  margin: 0;
+  padding: 2px 0;
+  font-weight: 600;
+  line-height: 1.35;
+}
