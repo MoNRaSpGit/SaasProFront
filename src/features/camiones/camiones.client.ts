@@ -38,6 +38,31 @@ export async function createCamionesClient(payload: {
   return readJson<{ item: CamionesClientsResponse["items"][number] }>(response);
 }
 
+export async function updateCamionesClient(
+  clientId: number,
+  payload: {
+    name: string;
+    phone?: string;
+    notes?: string;
+  }
+) {
+  const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/camiones/clients/${clientId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+  return readJson<{ item: CamionesClientsResponse["items"][number] }>(response);
+}
+
+export async function archiveCamionesClient(clientId: number) {
+  const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/camiones/clients/${clientId}/archive`, {
+    method: "PATCH"
+  });
+
+  return readJson<{ ok: true }>(response);
+}
+
 export async function listCamionesPlaces(params?: { limit?: number; search?: string }) {
   const searchParams = new URLSearchParams();
   if (params?.limit) searchParams.set("limit", String(params.limit));
@@ -58,6 +83,30 @@ export async function createCamionesPlace(payload: {
   });
 
   return readJson<{ item: CamionesPlacesResponse["items"][number] }>(response);
+}
+
+export async function updateCamionesPlace(
+  placeId: number,
+  payload: {
+    name: string;
+    notes?: string;
+  }
+) {
+  const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/camiones/places/${placeId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+  return readJson<{ item: CamionesPlacesResponse["items"][number] }>(response);
+}
+
+export async function archiveCamionesPlace(placeId: number) {
+  const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/camiones/places/${placeId}/archive`, {
+    method: "PATCH"
+  });
+
+  return readJson<{ ok: true }>(response);
 }
 
 export async function listCamionesTrips(params?: {
