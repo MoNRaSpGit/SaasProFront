@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { UserTopBar } from "../../shared/components/UserTopBar";
 import { getStoredUser } from "../auth/auth.client";
 import {
   createPosPayment,
@@ -283,8 +283,11 @@ export function PosHomePage() {
       }}
     >
       <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+        <UserTopBar />
+
         <header
           style={{
+            marginTop: 16,
             padding: "18px 20px",
             borderRadius: 24,
             background: "#18222f",
@@ -326,9 +329,6 @@ export function PosHomePage() {
               >
                 Panel
               </button>
-              <Link to="/dashboard" style={{ ...tabButtonStyle(false), textDecoration: "none" }}>
-                Volver
-              </Link>
             </div>
           </div>
         </header>

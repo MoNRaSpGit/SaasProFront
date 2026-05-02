@@ -11,6 +11,15 @@ export function getEnabledModules(user: StoredAuthUser | null) {
 }
 
 export function getDefaultAuthenticatedRoute(user: StoredAuthUser | null) {
+  const modules = getEnabledModules(user);
+
+  if (modules.length === 1) {
+    const route = KNOWN_MODULE_ROUTES[modules[0]];
+    if (route) {
+      return route;
+    }
+  }
+
   return "/dashboard";
 }
 

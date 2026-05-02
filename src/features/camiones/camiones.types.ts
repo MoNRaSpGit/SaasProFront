@@ -18,6 +18,7 @@ export type CamionesTrip = {
   branchId: number | null;
   userId: number;
   clientId: number;
+  placeId: number | null;
   clientName: string;
   tripDate: string;
   place: string;
@@ -27,6 +28,17 @@ export type CamionesTrip = {
   updatedAt: string;
   createdAt: string;
   paidAt: string | null;
+};
+
+export type CamionesPlace = {
+  id: number;
+  tenantId: number;
+  branchId: number | null;
+  name: string;
+  notes: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type CamionesClientsResponse = {
@@ -40,6 +52,15 @@ export type CamionesClientsResponse = {
 
 export type CamionesTripsResponse = {
   items: CamionesTrip[];
+  meta: {
+    tenantId: number;
+    count: number;
+    limit: number;
+  };
+};
+
+export type CamionesPlacesResponse = {
+  items: CamionesPlace[];
   meta: {
     tenantId: number;
     count: number;

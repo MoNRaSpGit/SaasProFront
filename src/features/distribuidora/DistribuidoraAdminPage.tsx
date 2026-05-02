@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { UserTopBar } from "../../shared/components/UserTopBar";
 import { getDistribuidoraAdminStatus } from "./distribuidora.client";
 import { DistribuidoraShellStatus } from "./distribuidora.types";
 
@@ -41,6 +42,8 @@ export function DistribuidoraAdminPage() {
   return (
     <main style={pageStyle}>
       <div style={{ maxWidth: 900, margin: "0 auto", display: "grid", gap: 18 }}>
+        <UserTopBar />
+
         <header style={heroStyle}>
           <p style={eyebrowStyle}>Vista admin shell</p>
           <div style={headerRowStyle}>
@@ -53,9 +56,6 @@ export function DistribuidoraAdminPage() {
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               <Link to="/distribuidora" style={secondaryLinkStyle}>
                 Modulo
-              </Link>
-              <Link to="/dashboard" style={secondaryLinkStyle}>
-                Dashboard
               </Link>
             </div>
           </div>

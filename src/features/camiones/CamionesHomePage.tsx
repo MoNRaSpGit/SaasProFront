@@ -1,16 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
 import { toast } from "react-toastify";
-import { getStoredUser } from "../auth/auth.client";
+import { ModelUserMenu } from "../../shared/components/ModelUserMenu";
 import {
   createCamionesClient as createCamionesClientRequest,
+  createCamionesPlace as createCamionesPlaceRequest,
   createCamionesTrip,
   listCamionesClients,
+  listCamionesPlaces,
   listCamionesTrips,
   markCamionesTripPaid as markCamionesTripPaidRequest
 } from "./camiones.client";
-import { createCamionesPlace, getCamionesPlaces } from "./camiones.storage";
-import { CamionesClient, CamionesTrip } from "./camiones.types";
+import { CamionesClient, CamionesPlace, CamionesTrip } from "./camiones.types";
 
 type CamionesTab = "cliente" | "viaje" | "registro";
 
@@ -33,26 +33,26 @@ function formatDateLabel(value: string) {
 }
 
 export function CamionesHomePage() {
-  const user = getStoredUser();
-  const userDisplayName =
-    user?.fullName?.trim() || user?.tenantContext?.tenant.name || user?.email || "Usuario";
   const clientInputRef = useRef<HTMLInputElement | null>(null);
   const placeInputRef = useRef<HTMLInputElement | null>(null);
   const kilometersInputRef = useRef<HTMLInputElement | null>(null);
   const [tab, setTab] = useState<CamionesTab>("cliente");
   const [clients, setClients] = useState<CamionesClient[]>([]);
-  const [places, setPlaces] = useState<string[]>([]);
+  const [places, setPlaces] = useState<CamionesPlace[]>([]);
   const [trips, setTrips] = useState<CamionesTrip[]>([]);
   const [clientSearch, setClientSearch] = useState("");
   const [selectedClient, setSelectedClient] = useState<CamionesClient | null>(null);
   const [tripDate, setTripDate] = useState(getTodayDate());
   const [placeSearch, setPlaceSearch] = useState("");
-  const [selectedPlace, setSelectedPlace] = useState("");
+  const [selectedPlace, setSelectedPlace] = useState<CamionesPlace | null>(null);
   const [kilometers, setKilometers] = useState("");
   const [loading, setLoading] = useState(true);
   const [savingTrip, setSavingTrip] = useState(false);
   const [savingClient, setSavingClient] = useState(false);
   const [markingPaidId, setMarkingPaidId] = useState<number | null>(null);
+  const [clientModalOpen, setClientModalOpen] = useState(false);
+  const [clientDraftName, setClientDraftName] = useState("");
+  const [clientDraftPhone, setClientDraftPhone] = useState("");
 
   useEffect(() => {
     void loadInitialData();
@@ -72,14 +72,15 @@ export function CamionesHomePage() {
     setLoading(true);
 
     try {
-      const [clientsPayload, tripsPayload] = await Promise.all([
+      const [clientsPayload, placesPayload, tripsPayload] = await Promise.all([
         listCamionesClients({ limit: 100 }),
+        listCamionesPlaces({ limit: 100 }),
         listCamionesTrips({ limit: 100 })
       ]);
 
       setClients(clientsPayload.items);
+      setPlaces(placesPayload.items);
       setTrips(tripsPayload.items);
-      setPlaces(getCamionesPlaces());
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo cargar camiones");
     } finally {
@@ -95,6 +96,11 @@ export function CamionesHomePage() {
   async function refreshTrips() {
     const payload = await listCamionesTrips({ limit: 100 });
     setTrips(payload.items);
+  }
+
+  async function refreshPlaces() {
+    const payload = await listCamionesPlaces({ limit: 100 });
+    setPlaces(payload.items);
   }
 
   const clientPendingTripMap = useMemo(() => {
@@ -124,13 +130,13 @@ export function CamionesHomePage() {
       return places.slice(0, 8);
     }
 
-    return places.filter((place) => place.toLowerCase().includes(query));
+    return places.filter((place) => place.name.toLowerCase().includes(query));
   }, [placeSearch, places]);
 
   function clearTripForm() {
     setTripDate(getTodayDate());
     setPlaceSearch("");
-    setSelectedPlace("");
+    setSelectedPlace(null);
     setKilometers("");
   }
 
@@ -142,7 +148,7 @@ export function CamionesHomePage() {
   }
 
   async function handleCreateClient() {
-    const name = clientSearch.trim();
+    const name = clientDraftName.trim();
     if (!name) {
       toast.error("Escribe el nombre del cliente");
       return;
@@ -151,10 +157,16 @@ export function CamionesHomePage() {
     setSavingClient(true);
 
     try {
-      const payload = await createCamionesClientRequest({ name });
+      const payload = await createCamionesClientRequest({
+        name,
+        phone: clientDraftPhone.trim() || undefined
+      });
       await refreshClients();
       setSelectedClient(payload.item);
       setClientSearch(payload.item.name);
+      setClientDraftName("");
+      setClientDraftPhone("");
+      setClientModalOpen(false);
       clearTripForm();
       toast.success(`Cliente agregado: ${payload.item.name}`);
       setTab("viaje");
@@ -165,19 +177,23 @@ export function CamionesHomePage() {
     }
   }
 
-  function handleCreatePlace() {
+  async function handleCreatePlace() {
     const name = placeSearch.trim();
     if (!name) {
       toast.error("Escribe el lugar");
       return;
     }
 
-    const place = createCamionesPlace(name);
-    setPlaces(getCamionesPlaces());
-    setSelectedPlace(place);
-    setPlaceSearch(place);
-    toast.success(`Lugar agregado: ${place}`);
-    kilometersInputRef.current?.focus();
+    try {
+      const payload = await createCamionesPlaceRequest({ name });
+      await refreshPlaces();
+      setSelectedPlace(payload.item);
+      setPlaceSearch(payload.item.name);
+      toast.success(`Lugar agregado: ${payload.item.name}`);
+      kilometersInputRef.current?.focus();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo crear el lugar");
+    }
   }
 
   async function goToTripStep() {
@@ -210,15 +226,14 @@ export function CamionesHomePage() {
     }
   }
 
-  function selectPlace(place: string) {
+  function selectPlace(place: CamionesPlace) {
     setSelectedPlace(place);
-    setPlaceSearch(place);
+    setPlaceSearch(place.name);
     kilometersInputRef.current?.focus();
   }
 
   async function handleSaveTrip() {
     const kmValue = Number(kilometers);
-    const rawPlace = selectedPlace || placeSearch.trim();
 
     if (!selectedClient) {
       toast.error("Falta el cliente");
@@ -230,7 +245,7 @@ export function CamionesHomePage() {
       return;
     }
 
-    if (!rawPlace) {
+    if (!selectedPlace) {
       toast.error("Falta el lugar");
       return;
     }
@@ -243,13 +258,10 @@ export function CamionesHomePage() {
     setSavingTrip(true);
 
     try {
-      const effectivePlace = createCamionesPlace(rawPlace);
-      setPlaces(getCamionesPlaces());
-
       await createCamionesTrip({
         clientId: selectedClient.id,
+        placeId: selectedPlace.id,
         tripDate,
-        place: effectivePlace,
         kilometers: Number(kmValue.toFixed(2))
       });
 
@@ -280,6 +292,12 @@ export function CamionesHomePage() {
     }
   }
 
+  function openClientModal() {
+    setClientDraftName(clientSearch.trim());
+    setClientDraftPhone("");
+    setClientModalOpen(true);
+  }
+
   return (
     <main
       style={{
@@ -292,28 +310,9 @@ export function CamionesHomePage() {
     >
       <div style={{ maxWidth: 720, margin: "0 auto" }}>
         <header style={heroStyle}>
-          <p style={heroEyebrowStyle}>Modelo Camiones</p>
-          <h1 style={{ margin: "10px 0 8px", fontSize: 30, lineHeight: 1.05 }}>Viajes simples y claros</h1>
-          <p style={heroBodyStyle}>
-            Primero buscas el cliente, despues cargas el viaje y al cobrarlo lo mandas al registro. Todo pensado para
-            usar comodo desde el celular.
-          </p>
-
-          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
-            <div style={heroUserWrapStyle}>
-              <div style={heroUserBadgeStyle}>
-                <span style={heroUserIconWrapStyle} aria-hidden="true">
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M20 21a8 8 0 0 0-16 0" />
-                    <circle cx="12" cy="8" r="4" />
-                  </svg>
-                </span>
-                <span style={heroUserNameStyle}>{userDisplayName}</span>
-              </div>
-              <Link to="/" style={heroExitLinkStyle}>
-                Salir
-              </Link>
-            </div>
+          <div style={heroTopRowStyle}>
+            <p style={heroEyebrowStyle}>Modelo Camiones</p>
+            <ModelUserMenu />
           </div>
         </header>
 
@@ -361,7 +360,7 @@ export function CamionesHomePage() {
                   />
                   <button
                     type="button"
-                    onClick={() => void handleCreateClient()}
+                    onClick={openClientModal}
                     style={plusButtonStyle}
                     aria-label="Agregar cliente"
                     disabled={savingClient}
@@ -435,12 +434,12 @@ export function CamionesHomePage() {
                     value={placeSearch}
                     onChange={(event) => {
                       setPlaceSearch(event.target.value);
-                      setSelectedPlace("");
+                      setSelectedPlace(null);
                     }}
                     placeholder="Ej: Piedra Sola"
                     style={inputStyle}
                   />
-                  <button type="button" onClick={handleCreatePlace} style={plusButtonStyle} aria-label="Agregar lugar">
+                  <button type="button" onClick={() => void handleCreatePlace()} style={plusButtonStyle} aria-label="Agregar lugar">
                     +
                   </button>
                 </div>
@@ -449,16 +448,16 @@ export function CamionesHomePage() {
               <div style={{ display: "grid", gap: 8 }}>
                 {filteredPlaces.map((place) => (
                   <button
-                    key={place}
+                    key={place.id}
                     type="button"
                     onClick={() => selectPlace(place)}
                     style={
-                      selectedPlace === place || placeSearch.trim().toLowerCase() === place.toLowerCase()
+                      selectedPlace?.id === place.id || placeSearch.trim().toLowerCase() === place.name.toLowerCase()
                         ? selectedButtonStyle
                         : pickerButtonStyle
                     }
                   >
-                    {place}
+                    {place.name}
                   </button>
                 ))}
                 {filteredPlaces.length === 0 ? <div style={emptyBoxStyle}>No hay lugares para esa busqueda.</div> : null}
@@ -524,12 +523,59 @@ export function CamionesHomePage() {
           </section>
         ) : null}
       </div>
+
+      {clientModalOpen ? (
+        <div style={modalOverlayStyle} onClick={() => setClientModalOpen(false)}>
+          <section style={modalCardStyle} onClick={(event) => event.stopPropagation()}>
+            <div style={{ display: "grid", gap: 6 }}>
+              <h3 style={{ margin: 0, fontSize: 24, color: "#2f241e" }}>Nuevo cliente</h3>
+              <p style={{ margin: 0, color: "#68594f", lineHeight: 1.5 }}>
+                Cargá los datos base del cliente para empezar a usarlo en viajes.
+              </p>
+            </div>
+
+            <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
+              <label style={fieldWrapStyle}>
+                <span style={fieldLabelStyle}>Nombre</span>
+                <input
+                  type="text"
+                  value={clientDraftName}
+                  onChange={(event) => setClientDraftName(event.target.value)}
+                  placeholder="Nombre del cliente"
+                  style={inputStyle}
+                />
+              </label>
+
+              <label style={fieldWrapStyle}>
+                <span style={fieldLabelStyle}>Telefono</span>
+                <input
+                  type="text"
+                  value={clientDraftPhone}
+                  onChange={(event) => setClientDraftPhone(event.target.value)}
+                  placeholder="099123456"
+                  style={inputStyle}
+                />
+              </label>
+            </div>
+
+            <div style={modalActionsStyle}>
+              <button type="button" onClick={() => setClientModalOpen(false)} style={modalCancelButtonStyle}>
+                Cancelar
+              </button>
+              <button type="button" onClick={() => void handleCreateClient()} style={saveButtonStyle} disabled={savingClient}>
+                {savingClient ? "Guardando..." : "Guardar cliente"}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </main>
   );
 }
 
 const heroStyle: React.CSSProperties = {
-  padding: "18px 16px 20px",
+  position: "relative",
+  padding: "18px 16px",
   borderRadius: 26,
   background: "linear-gradient(160deg, #39291f 0%, #241913 100%)",
   color: "#fbf5ec",
@@ -538,76 +584,17 @@ const heroStyle: React.CSSProperties = {
 
 const heroEyebrowStyle: React.CSSProperties = {
   margin: 0,
-  fontSize: 12,
-  textTransform: "uppercase",
-  letterSpacing: "0.16em",
-  color: "rgba(251, 245, 236, 0.72)"
-};
-
-const heroBodyStyle: React.CSSProperties = {
-  margin: 0,
-  color: "rgba(251, 245, 236, 0.82)",
-  lineHeight: 1.6
-};
-
-const heroPrimaryLinkStyle: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  padding: "11px 15px",
-  borderRadius: 999,
-  textDecoration: "none",
+  fontSize: 28,
+  lineHeight: 1.05,
   fontWeight: 800,
-  background: "#f3c57d",
-  color: "#2f2117",
-  border: "1px solid rgba(95, 63, 8, 0.2)",
-  boxShadow: "0 10px 20px rgba(243, 197, 125, 0.24)"
+  color: "#fbf5ec"
 };
 
-const heroUserWrapStyle: React.CSSProperties = {
-  display: "grid",
-  justifyItems: "end",
-  gap: 8
-};
-
-const heroUserBadgeStyle: React.CSSProperties = {
-  display: "inline-flex",
+const heroTopRowStyle: React.CSSProperties = {
+  display: "flex",
   alignItems: "center",
-  gap: 10,
-  maxWidth: "100%",
-  padding: "10px 14px",
-  borderRadius: 999,
-  background: "rgba(255, 248, 240, 0.12)",
-  border: "1px solid rgba(255, 248, 240, 0.16)",
-  boxShadow: "0 10px 20px rgba(15, 9, 7, 0.12)"
-};
-
-const heroUserIconWrapStyle: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  width: 32,
-  height: 32,
-  borderRadius: 999,
-  background: "#f3c57d",
-  color: "#2f2117",
-  flexShrink: 0
-};
-
-const heroUserNameStyle: React.CSSProperties = {
-  fontWeight: 800,
-  color: "#fbf5ec",
-  whiteSpace: "nowrap",
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-  maxWidth: 220
-};
-
-const heroExitLinkStyle: React.CSSProperties = {
-  fontSize: 13,
-  fontWeight: 700,
-  color: "rgba(251, 245, 236, 0.82)",
-  textDecoration: "none"
+  justifyContent: "space-between",
+  gap: 12
 };
 
 const tabsWrapStyle: React.CSSProperties = {
@@ -828,4 +815,44 @@ const emptyBoxStyle: React.CSSProperties = {
   border: "1px dashed #d8ccbf",
   background: "#fffaf4",
   color: "#726255"
+};
+
+const modalOverlayStyle: React.CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  background: "rgba(26, 18, 14, 0.42)",
+  display: "grid",
+  placeItems: "center",
+  padding: 16,
+  zIndex: 60
+};
+
+const modalCardStyle: React.CSSProperties = {
+  width: "100%",
+  maxWidth: 420,
+  padding: 20,
+  borderRadius: 24,
+  background: "#fffdf9",
+  border: "1px solid #ded3c6",
+  boxShadow: "0 24px 50px rgba(26, 18, 14, 0.22)"
+};
+
+const modalActionsStyle: React.CSSProperties = {
+  display: "flex",
+  justifyContent: "flex-end",
+  gap: 10,
+  marginTop: 18,
+  flexWrap: "wrap"
+};
+
+const modalCancelButtonStyle: React.CSSProperties = {
+  minHeight: 52,
+  padding: "14px 16px",
+  borderRadius: 18,
+  border: "1px solid #d8ccbf",
+  background: "#fff8f0",
+  color: "#5d4a3e",
+  fontWeight: 800,
+  fontSize: 16,
+  cursor: "pointer"
 };

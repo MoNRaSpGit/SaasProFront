@@ -1,5 +1,5 @@
 import { fetchWithAuth } from "../auth/auth.client";
-import { CamionesClientsResponse, CamionesTripsResponse } from "./camiones.types";
+import { CamionesClientsResponse, CamionesPlacesResponse, CamionesTripsResponse } from "./camiones.types";
 import { API_BASE_URL } from "../../shared/config/api";
 
 async function readJson<T>(response: Response): Promise<T> {
@@ -38,6 +38,28 @@ export async function createCamionesClient(payload: {
   return readJson<{ item: CamionesClientsResponse["items"][number] }>(response);
 }
 
+export async function listCamionesPlaces(params?: { limit?: number; search?: string }) {
+  const searchParams = new URLSearchParams();
+  if (params?.limit) searchParams.set("limit", String(params.limit));
+  if (params?.search) searchParams.set("search", params.search);
+  const query = searchParams.toString();
+  const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/camiones/places${query ? `?${query}` : ""}`);
+  return readJson<CamionesPlacesResponse>(response);
+}
+
+export async function createCamionesPlace(payload: {
+  name: string;
+  notes?: string;
+}) {
+  const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/camiones/places`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+  return readJson<{ item: CamionesPlacesResponse["items"][number] }>(response);
+}
+
 export async function listCamionesTrips(params?: {
   limit?: number;
   clientId?: number;
@@ -54,8 +76,8 @@ export async function listCamionesTrips(params?: {
 
 export async function createCamionesTrip(payload: {
   clientId: number;
+  placeId: number;
   tripDate: string;
-  place: string;
   kilometers: number;
   notes?: string;
 }) {

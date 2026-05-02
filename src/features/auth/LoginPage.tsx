@@ -14,8 +14,21 @@ type LoginFormValues = {
 
 type LoginResponse = AuthSession;
 
-const CAMIONES_DEMO_EMAIL = "camiones.demo@saaspro.com";
-const CAMIONES_DEMO_PASSWORD = "camiones123";
+const SINGLE_MODULE_DEMO = {
+  label: "1 modulo",
+  title: "POS directo",
+  email: "pos.demo@saaspro.com",
+  password: "posdemo123",
+  description: "Entra directo a POS porque el tenant tiene un solo modulo."
+};
+
+const MULTI_MODULE_DEMO = {
+  label: "2 modulos",
+  title: "POS + Camiones",
+  email: "operaciones.demo@saaspro.com",
+  password: "opsdemo123",
+  description: "Entra al dashboard porque el tenant tiene mas de un modulo."
+};
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -80,25 +93,33 @@ export function LoginPage() {
           <button
             type="button"
             onClick={() => {
-              setValue("email", "juan@saaspro.com");
-              setValue("password", "12345");
+              setValue("email", SINGLE_MODULE_DEMO.email);
+              setValue("password", SINGLE_MODULE_DEMO.password);
             }}
             style={demoButtonStyle}
           >
-            <strong style={demoTitleStyle}>Demo base</strong>
-            <span style={demoTextStyle}>juan@saaspro.com / 12345</span>
+            <span style={demoBadgeStyle}>{SINGLE_MODULE_DEMO.label}</span>
+            <strong style={demoTitleStyle}>{SINGLE_MODULE_DEMO.title}</strong>
+            <span style={demoTextStyle}>
+              {SINGLE_MODULE_DEMO.email} / {SINGLE_MODULE_DEMO.password}
+            </span>
+            <span style={demoHintStyle}>{SINGLE_MODULE_DEMO.description}</span>
           </button>
 
           <button
             type="button"
             onClick={() => {
-              setValue("email", CAMIONES_DEMO_EMAIL);
-              setValue("password", CAMIONES_DEMO_PASSWORD);
+              setValue("email", MULTI_MODULE_DEMO.email);
+              setValue("password", MULTI_MODULE_DEMO.password);
             }}
             style={camionesDemoButtonStyle}
           >
-            <strong style={demoTitleStyle}>Camiones</strong>
-            <span style={demoTextStyle}>{CAMIONES_DEMO_EMAIL}</span>
+            <span style={demoBadgeStyle}>{MULTI_MODULE_DEMO.label}</span>
+            <strong style={demoTitleStyle}>{MULTI_MODULE_DEMO.title}</strong>
+            <span style={demoTextStyle}>
+              {MULTI_MODULE_DEMO.email} / {MULTI_MODULE_DEMO.password}
+            </span>
+            <span style={demoHintStyle}>{MULTI_MODULE_DEMO.description}</span>
           </button>
         </div>
 
@@ -210,7 +231,7 @@ const demoGridStyle: React.CSSProperties = {
 
 const demoButtonStyle: React.CSSProperties = {
   display: "grid",
-  gap: 4,
+  gap: 6,
   width: "100%",
   textAlign: "left",
   padding: "14px 16px",
@@ -231,9 +252,27 @@ const demoTitleStyle: React.CSSProperties = {
   color: "#182433"
 };
 
+const demoBadgeStyle: React.CSSProperties = {
+  width: "fit-content",
+  padding: "4px 9px",
+  borderRadius: 999,
+  background: "rgba(23, 36, 51, 0.08)",
+  color: "#314253",
+  fontSize: 11,
+  fontWeight: 800,
+  textTransform: "uppercase",
+  letterSpacing: "0.08em"
+};
+
 const demoTextStyle: React.CSSProperties = {
   fontSize: 13,
   color: "#60707d"
+};
+
+const demoHintStyle: React.CSSProperties = {
+  fontSize: 12,
+  color: "#4c5d6b",
+  lineHeight: 1.45
 };
 
 const formStyle: React.CSSProperties = {

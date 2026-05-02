@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import { getStoredUser } from "../auth/auth.client";
 import { BuildMetaCard } from "../../shared/components/BuildMetaCard";
+import { UserTopBar } from "../../shared/components/UserTopBar";
 import { getSaasAdminTenants, updateSaasAdminTenantBilling, updateSaasAdminTenantModules } from "./saas-admin.client";
 import { SaasAdminModuleKey, SaasAdminTenantBilling, SaasAdminTenantItem } from "./saas-admin.types";
 
@@ -168,6 +168,8 @@ export function SaasAdminHomePage() {
 
   return (
     <main style={pageStyle}>
+      <UserTopBar />
+
       <section style={heroStyle}>
         <p style={eyebrowStyle}>SaaS Admin Lite</p>
         <h1 style={titleStyle}>Control interno de tenants</h1>
@@ -175,9 +177,6 @@ export function SaasAdminHomePage() {
           Vista interna para revisar clientes, modulos habilitados y estado de cobro sin salir del SaaS.
         </p>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 18 }}>
-          <Link to="/dashboard" style={linkButtonStyle(false)}>
-            Volver al dashboard
-          </Link>
           <span style={chipStyle}>Operador: {user?.email || "N/A"}</span>
         </div>
       </section>

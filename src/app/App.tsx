@@ -33,9 +33,9 @@ function HomePage() {
           <p style={{ margin: 0, letterSpacing: "0.16em", textTransform: "uppercase", fontSize: 12, opacity: 0.74 }}>
             SaaS Multi-Modelo
           </p>
-          <h1 style={{ margin: "12px 0 10px", fontSize: 42, lineHeight: 1.05 }}>SaaSPro Frontend</h1>
+          <h1 style={{ margin: "12px 0 10px", fontSize: 42, lineHeight: 1.05 }}>SaaSPro</h1>
           <p style={{ margin: 0, maxWidth: 720, fontSize: 18, lineHeight: 1.6, opacity: 0.86 }}>
-            Base del SaaS con auth y modelo <strong>`pos`</strong> ya operativo dentro del contexto multi-tenant.
+            Entrada principal del SaaS para autenticacion, registro y acceso al espacio de trabajo de cada cliente.
           </p>
 
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 22 }}>
@@ -56,7 +56,7 @@ function HomePage() {
             marginTop: 22,
             display: "grid",
             gap: 18,
-            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))"
+            gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))"
           }}
         >
           <article style={homeCardStyle}>
@@ -69,38 +69,24 @@ function HomePage() {
           </article>
 
           <article style={homeCardStyle}>
-            <p style={eyebrowStyle}>Modelo</p>
-            <h2 style={cardTitleStyle}>POS</h2>
-            <p style={cardBodyStyle}>Caja con scanner, carrito, ventas, pagos y panel por tenant dentro del SaaS.</p>
-            <Link to="/pos" style={cardLinkStyle}>
-              Abrir POS
+            <p style={eyebrowStyle}>Cliente</p>
+            <h2 style={cardTitleStyle}>Dashboard</h2>
+            <p style={cardBodyStyle}>
+              Punto de entrada de cada tenant para ver sus modulos habilitados y entrar al flujo correcto.
+            </p>
+            <Link to="/dashboard" style={cardLinkStyle}>
+              Ir al dashboard
             </Link>
           </article>
 
           <article style={homeCardStyle}>
-            <p style={eyebrowStyle}>Modelo</p>
-            <h2 style={cardTitleStyle}>Distribuidora</h2>
+            <p style={eyebrowStyle}>Cuenta</p>
+            <h2 style={cardTitleStyle}>Registro</h2>
             <p style={cardBodyStyle}>
-              Shell oficial del SaaS para distribuidora, ya conectado a auth real y listo para evolucionar negocio.
+              Alta de un tenant nuevo con su usuario principal y contexto base listo para empezar.
             </p>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 14 }}>
-              <Link to="/distribuidora" style={cardLinkStyle}>
-                Abrir modelo
-              </Link>
-              <Link to="/distribuidora/admin" style={subtleLinkStyle}>
-                Ver admin
-              </Link>
-            </div>
-          </article>
-
-          <article style={homeCardStyle}>
-            <p style={eyebrowStyle}>Modelo</p>
-            <h2 style={cardTitleStyle}>Camiones</h2>
-            <p style={cardBodyStyle}>
-              Base visual mobile-first para viajes, registro operativo y futuros flujos SaaS del cliente.
-            </p>
-            <Link to="/camiones" style={cardLinkStyle}>
-              Abrir modelo
+            <Link to="/register" style={cardLinkStyle}>
+              Crear cuenta
             </Link>
           </article>
 
@@ -240,16 +226,5 @@ const cardLinkStyle: React.CSSProperties = {
   textDecoration: "none",
   background: "#172433",
   color: "#f7fafc",
-  fontWeight: 700
-};
-
-const subtleLinkStyle: React.CSSProperties = {
-  display: "inline-flex",
-  marginTop: 14,
-  padding: "10px 14px",
-  borderRadius: 14,
-  textDecoration: "none",
-  background: "#eef4fa",
-  color: "#1f3953",
   fontWeight: 700
 };

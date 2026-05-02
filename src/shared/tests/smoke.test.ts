@@ -22,15 +22,24 @@ function buildUser(modules: string[]): StoredAuthUser {
         status: "active",
         isDefault: true
       },
+      billing: {
+        status: "active",
+        paidUntil: null,
+        graceUntil: null,
+        blockedReason: null
+      },
       modules
     }
   };
 }
 
 describe("frontend smoke", () => {
-  it("always routes authenticated users through the dashboard", () => {
-    expect(getDefaultAuthenticatedRoute(buildUser(["camiones"]))).toBe("/dashboard");
-    expect(getDefaultAuthenticatedRoute(buildUser(["pos"]))).toBe("/dashboard");
+  it("routes single-module users directly into their module", () => {
+    expect(getDefaultAuthenticatedRoute(buildUser(["camiones"]))).toBe("/camiones");
+    expect(getDefaultAuthenticatedRoute(buildUser(["pos"]))).toBe("/pos");
+  });
+
+  it("keeps dashboard for multi-module tenants", () => {
     expect(getDefaultAuthenticatedRoute(buildUser(["camiones", "pos"]))).toBe("/dashboard");
   });
 

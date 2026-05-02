@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { UserTopBar } from "../../shared/components/UserTopBar";
 import { getStoredUser } from "../auth/auth.client";
 import { userHasCapability } from "../auth/tenant-capabilities";
 import { getDistribuidoraStatus } from "./distribuidora.client";
@@ -47,6 +48,8 @@ export function DistribuidoraHomePage() {
   return (
     <main style={pageStyle}>
       <div style={{ maxWidth: 920, margin: "0 auto", display: "grid", gap: 18 }}>
+        <UserTopBar />
+
         <section style={heroStyle}>
           <p style={eyebrowStyle}>Modulo oficial SaaS</p>
           <div style={headerRowStyle}>
@@ -57,9 +60,6 @@ export function DistribuidoraHomePage() {
               </p>
             </div>
             <div style={heroActionsStyle}>
-              <Link to="/dashboard" style={secondaryLinkStyle}>
-                Dashboard
-              </Link>
               {canViewAdmin ? (
                 <Link to="/distribuidora/admin" style={primaryLinkStyle}>
                   Vista admin
