@@ -7,6 +7,7 @@ import { LoginPage } from "../features/auth/LoginPage";
 import { ProtectedRoute } from "../features/auth/ProtectedRoute";
 import { RegisterPage } from "../features/auth/RegisterPage";
 import { PosHomePage } from "../features/pos/PosHomePage";
+import { SaasAdminHomePage } from "../features/saas-admin/SaasAdminHomePage";
 
 function HomePage() {
   return (
@@ -80,7 +81,7 @@ function HomePage() {
             <p style={eyebrowStyle}>Modelo</p>
             <h2 style={cardTitleStyle}>Distribuidora</h2>
             <p style={cardBodyStyle}>
-              Pedido por cliente con productos mock, guardado en `localStorage` y vista admin simulada.
+              Shell oficial del SaaS para distribuidora, ya conectado a auth real y listo para evolucionar negocio.
             </p>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 14 }}>
               <Link to="/distribuidora" style={cardLinkStyle}>
@@ -111,6 +112,15 @@ function HomePage() {
               Ver health
             </Link>
           </article>
+
+          <article style={homeCardStyle}>
+            <p style={eyebrowStyle}>Interno</p>
+            <h2 style={cardTitleStyle}>SaaS Admin</h2>
+            <p style={cardBodyStyle}>Panel interno lite para revisar tenants, modulos y estado de cobro.</p>
+            <Link to="/saas-admin" style={cardLinkStyle}>
+              Abrir panel
+            </Link>
+          </article>
         </section>
       </div>
     </main>
@@ -136,6 +146,14 @@ export function App() {
         element={
           <ProtectedRoute>
             <DashboardPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/saas-admin"
+        element={
+          <ProtectedRoute requireSaasAdmin>
+            <SaasAdminHomePage />
           </ProtectedRoute>
         }
       />

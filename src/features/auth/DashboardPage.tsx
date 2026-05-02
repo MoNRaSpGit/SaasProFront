@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { BuildMetaCard } from "../../shared/components/BuildMetaCard";
 import { getStoredUser, logoutSession, refreshSession } from "./auth.client";
 import { getEnabledModules } from "./module-routing";
+import { userCanAccessSaasAdmin } from "./tenant-capabilities";
 
 export function DashboardPage() {
   const navigate = useNavigate();
@@ -10,6 +11,7 @@ export function DashboardPage() {
   const user = useMemo(() => getStoredUser(), []);
   const modules = getEnabledModules(user);
   const hasModules = modules.length > 0;
+  const canAccessSaasAdmin = userCanAccessSaasAdmin(user);
   const handleRefresh = async () => {
     setStatus("Renovando token...");
     const tokens = await refreshSession();
@@ -40,6 +42,7 @@ export function DashboardPage() {
           {modules.includes("pos") ? <Link to="/pos">Abrir POS</Link> : null}
           {modules.includes("camiones") ? <Link to="/camiones">Abrir Camiones</Link> : null}
           {modules.includes("distribuidora") ? <Link to="/distribuidora">Abrir Distribuidora</Link> : null}
+          {canAccessSaasAdmin ? <Link to="/saas-admin">Abrir SaaS Admin</Link> : null}
         </div>
       ) : (
         <section
@@ -54,6 +57,7 @@ export function DashboardPage() {
         >
           Tu cuenta esta creada, pero todavia no tiene modulos habilitados. Cuando `SaasPro` active tus modelos,
           van a aparecer aca.
+          {canAccessSaasAdmin ? " Tu acceso interno SaaS sigue disponible desde el panel admin." : null}
         </section>
       )}
 

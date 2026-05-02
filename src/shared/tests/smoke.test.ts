@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getDefaultAuthenticatedRoute, getFirstAccessibleModuleRoute, hasModuleAccess } from "../../features/auth/module-routing";
-import { userHasCapability } from "../../features/auth/tenant-capabilities";
+import { userCanAccessSaasAdmin, userHasCapability } from "../../features/auth/tenant-capabilities";
 import { StoredAuthUser } from "../../features/auth/auth.types";
 import { FRONTEND_BUILD_INFO } from "../config/build";
 
@@ -61,6 +61,8 @@ describe("frontend smoke", () => {
     expect(userHasCapability(adminUser, "distribuidora.admin.read")).toBe(true);
     expect(userHasCapability(operarioUser, "distribuidora.admin.read")).toBe(false);
     expect(userHasCapability(operarioUser, "distribuidora.shell.read")).toBe(true);
+    expect(userCanAccessSaasAdmin(adminUser)).toBe(true);
+    expect(userCanAccessSaasAdmin({ ...adminUser, role: "member" })).toBe(false);
   });
 
   it("exposes frontend build information", () => {
