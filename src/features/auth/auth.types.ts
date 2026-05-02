@@ -17,6 +17,12 @@ export type TenantContext = {
     status: string;
     isDefault: boolean;
   };
+  billing: {
+    status: "active" | "grace_period" | "pending_manual_block" | "blocked";
+    paidUntil: string | null;
+    graceUntil: string | null;
+    blockedReason: string | null;
+  };
   modules: string[];
 };
 
