@@ -3,9 +3,7 @@ import { StoredAuthUser } from "./auth.types";
 const KNOWN_MODULE_ROUTES: Record<string, string> = {
   pos: "/pos",
   camiones: "/camiones",
-  distribuidora: "/distribuidora",
-  almacen: "/almacen",
-  cafeteria: "/cafeteria"
+  distribuidora: "/distribuidora"
 };
 
 export function getEnabledModules(user: StoredAuthUser | null) {

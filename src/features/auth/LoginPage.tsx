@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
 import { API_BASE_URL } from "../../shared/config/api";
-import { isDemoAuthEnabled, saveSession } from "./auth.client";
+import { saveSession } from "./auth.client";
 import { getDefaultAuthenticatedRoute } from "./module-routing";
 import { AuthSession } from "./auth.types";
 
@@ -15,7 +15,6 @@ type LoginResponse = AuthSession;
 
 const CAMIONES_DEMO_EMAIL = "camiones.demo@saaspro.com";
 const CAMIONES_DEMO_PASSWORD = "camiones123";
-const DEMO_AUTH_ENABLED = isDemoAuthEnabled();
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -58,44 +57,6 @@ export function LoginPage() {
     }
   };
 
-  const handleDistribuidoraDemoAccess = () => {
-    const demoSession: AuthSession = {
-      user: {
-        id: 999001,
-        email: "demo.distribuidora@saaspro.local",
-        fullName: "Demo Distribuidora",
-        role: "admin"
-      },
-      tenantContext: {
-        tenant: {
-          id: 999,
-          name: "Distribuidora Demo",
-          slug: "distribuidora-demo",
-          status: "active"
-        },
-        membership: {
-          role: "admin",
-          status: "active",
-          isDefault: true
-        },
-        modules: ["distribuidora"]
-      },
-      tokens: {
-        accessToken: "demo-distribuidora-access-token",
-        refreshToken: "demo-distribuidora-refresh-token",
-        tokenType: "Bearer",
-        accessTtl: "24h",
-        refreshTtl: "7d"
-      },
-      isDemoSession: true
-    };
-
-    saveSession(demoSession);
-    setApiError(null);
-    setLoggedUser(demoSession.user);
-    navigate(getDefaultAuthenticatedRoute({ ...demoSession.user, tenantContext: demoSession.tenantContext }));
-  };
-
   return (
     <main style={pageStyle}>
       <section style={heroPanelStyle}>
@@ -126,13 +87,6 @@ export function LoginPage() {
             <strong style={demoTitleStyle}>Demo base</strong>
             <span style={demoTextStyle}>juan@saaspro.com / 12345</span>
           </button>
-
-          {DEMO_AUTH_ENABLED ? (
-            <button type="button" onClick={handleDistribuidoraDemoAccess} style={distribuidoraDemoButtonStyle}>
-              <strong style={demoTitleStyle}>Distribuidora</strong>
-              <span style={demoTextStyle}>entra directo al flujo demo</span>
-            </button>
-          ) : null}
 
           <button
             type="button"
@@ -184,11 +138,9 @@ export function LoginPage() {
             Crear cuenta
           </Link>
         </p>
-        {!DEMO_AUTH_ENABLED ? (
-          <p style={{ margin: 0, color: "#7a8793", fontSize: 13 }}>
-            El acceso demo directo de distribuidora esta desactivado en este entorno.
-          </p>
-        ) : null}
+        <p style={{ margin: 0, color: "#7a8793", fontSize: 13 }}>
+          `distribuidora` ya no entra por sesion fake: ahora forma parte oficial del SaaS y requiere modulo habilitado.
+        </p>
       </section>
     </main>
   );
@@ -263,12 +215,6 @@ const demoButtonStyle: React.CSSProperties = {
   border: "1px solid #d6dde6",
   background: "#f7fafc",
   cursor: "pointer"
-};
-
-const distribuidoraDemoButtonStyle: React.CSSProperties = {
-  ...demoButtonStyle,
-  border: "1px solid #cfe0f4",
-  background: "#eef4fb"
 };
 
 const camionesDemoButtonStyle: React.CSSProperties = {

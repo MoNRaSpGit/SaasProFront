@@ -1,267 +1,197 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { getDistribuidoraOrders } from "./distribuidora.storage";
+import { getDistribuidoraAdminStatus } from "./distribuidora.client";
+import { DistribuidoraShellStatus } from "./distribuidora.types";
 
 export function DistribuidoraAdminPage() {
-  const orders = getDistribuidoraOrders();
-  const totalRevenue = orders.reduce((sum, order) => sum + order.totalAmount, 0);
+  const [status, setStatus] = useState<DistribuidoraShellStatus | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadStatus() {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const payload = await getDistribuidoraAdminStatus();
+        if (!cancelled) {
+          setStatus(payload);
+        }
+      } catch (nextError) {
+        if (!cancelled) {
+          setError(nextError instanceof Error ? nextError.message : "No se pudo cargar la vista admin");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadStatus();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        padding: "28px 16px 48px",
-        fontFamily: "system-ui, sans-serif",
-        background: "linear-gradient(180deg, #eef2f5 0%, #e7edf1 100%)"
-      }}
-    >
-      <div style={{ maxWidth: 980, margin: "0 auto" }}>
-        <header style={headerStyle}>
-          <p style={eyebrowStyle}>Admin distribuidora</p>
-          <div style={headerTopRowStyle}>
+    <main style={pageStyle}>
+      <div style={{ maxWidth: 900, margin: "0 auto", display: "grid", gap: 18 }}>
+        <header style={heroStyle}>
+          <p style={eyebrowStyle}>Vista admin shell</p>
+          <div style={headerRowStyle}>
             <div>
-              <h1 style={{ margin: 0, fontSize: 32 }}>Pedidos recibidos</h1>
-              <p style={{ margin: "8px 0 0", color: "#adbac4" }}>
-                Vista simple para revisar pedidos guardados.
+              <h1 style={{ margin: 0, fontSize: 32 }}>Distribuidora Admin</h1>
+              <p style={heroTextStyle}>
+                La vista administrativa ya esta registrada dentro del SaaS, pero todavia no consume pedidos reales.
               </p>
             </div>
-            <div style={headerActionsStyle}>
-              <Link to="/distribuidora" style={adminLinkStyle}>
-                Volver a pedidos
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <Link to="/distribuidora" style={secondaryLinkStyle}>
+                Modulo
               </Link>
-              <Link to="/dashboard" style={adminLinkStyle}>
+              <Link to="/dashboard" style={secondaryLinkStyle}>
                 Dashboard
               </Link>
             </div>
           </div>
-
-          <div style={summaryRowStyle}>
-            <span style={summaryChipStyle}>Pedidos: {orders.length}</span>
-            <span style={summaryChipStyle}>Total: ${totalRevenue.toFixed(2)}</span>
-          </div>
         </header>
 
         <section style={panelStyle}>
-          {orders.length === 0 ? (
-            <div style={emptyStyle}>Todavia no hay pedidos guardados.</div>
-          ) : (
+          {loading ? <p style={mutedTextStyle}>Cargando vista admin shell...</p> : null}
+          {error ? <div style={errorBoxStyle}>{error}</div> : null}
+          {status ? (
             <div style={{ display: "grid", gap: 16 }}>
-              {orders.map((order, index) => (
-                <article key={order.id} style={orderCardStyle}>
-                  <div style={orderHeaderStyle}>
-                    <div>
-                      <div style={orderMetaStyle}>
-                        <span style={orderNumberStyle}>Pedido #{orders.length - index}</span>
-                        <span>{new Date(order.createdAt).toLocaleString()}</span>
-                      </div>
-                      <h2 style={orderClientStyle}>{order.clientName}</h2>
-                    </div>
-                    <strong style={orderTotalStyle}>${order.totalAmount.toFixed(2)}</strong>
-                  </div>
+              <div style={chipRowStyle}>
+                <span style={chipStyle}>Vista: {status.view || "shell"}</span>
+                <span style={chipStyle}>Tenant: {status.tenant.slug}</span>
+                <span style={chipStyle}>Estado: {status.status}</span>
+              </div>
 
-                  <div style={orderInfoStripStyle}>
-                    <span style={infoPillStyle}>{order.items.length} productos</span>
-                    <span style={infoPillStyle}>
-                      {order.items.reduce((sum, item) => sum + item.quantity, 0)} unidades
-                    </span>
-                  </div>
+              <div style={panelInsetStyle}>
+                <h2 style={{ marginTop: 0, marginBottom: 10, color: "#183348" }}>Que ya esta resuelto</h2>
+                <ul style={listStyle}>
+                  <li>Acceso real a la ruta admin por auth del SaaS.</li>
+                  <li>Validacion de modulo `distribuidora` habilitado.</li>
+                  <li>Contexto tenant disponible para futuras pantallas reales.</li>
+                </ul>
+              </div>
 
-                  <div style={itemsBlockStyle}>
-                    <div style={itemsHeaderStyle}>
-                      <strong style={{ color: "#22303a" }}>Detalle</strong>
-                    </div>
+              <div style={panelInsetStyle}>
+                <h2 style={{ marginTop: 0, marginBottom: 10, color: "#183348" }}>Que queda para despues</h2>
+                <ul style={listStyle}>
+                  <li>Pedidos reales por tenant.</li>
+                  <li>Productos reales por tenant.</li>
+                  <li>Lectura admin conectada a backend de negocio.</li>
+                </ul>
+              </div>
 
-                    <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
-                    {order.items.map((item, itemIndex) => (
-                      <div key={`${order.id}-${item.productId}-${itemIndex}`} style={itemRowStyle}>
-                        <div>
-                          <strong style={{ display: "block", color: "#1e2a33" }}>{item.productName}</strong>
-                          <span style={{ color: "#64727c", fontSize: 13 }}>
-                            {item.quantity} x ${item.unitPrice.toFixed(2)}
-                          </span>
-                        </div>
-                        <strong style={itemTotalStyle}>${(item.quantity * item.unitPrice).toFixed(2)}</strong>
-                      </div>
-                    ))}
-                    </div>
-                  </div>
-
-                  <div style={notesStyle}>
-                    <strong style={{ display: "block", fontSize: 13, color: "#51606b" }}>Observaciones</strong>
-                    <p style={{ margin: "6px 0 0", color: "#26333d" }}>{order.notes || "Sin notas"}</p>
-                  </div>
-                </article>
-              ))}
+              <p style={{ margin: 0, color: "#5b6a76" }}>{status.message}</p>
             </div>
-          )}
+          ) : null}
         </section>
       </div>
     </main>
   );
 }
 
-const headerStyle: React.CSSProperties = {
-  padding: "20px 22px",
-  borderRadius: 24,
-  background: "#1f2a33",
-  color: "#f6f8fa"
+const pageStyle: React.CSSProperties = {
+  minHeight: "100vh",
+  padding: "28px 16px 48px",
+  fontFamily: "system-ui, sans-serif",
+  background: "linear-gradient(180deg, #edf3f7 0%, #e6eef5 100%)"
+};
+
+const heroStyle: React.CSSProperties = {
+  padding: "24px 24px 26px",
+  borderRadius: 28,
+  background: "#22323d",
+  color: "#f7fbfe"
 };
 
 const eyebrowStyle: React.CSSProperties = {
   margin: 0,
-  opacity: 0.72,
   fontSize: 12,
   letterSpacing: "0.14em",
-  textTransform: "uppercase"
+  textTransform: "uppercase",
+  opacity: 0.74
 };
 
-const headerTopRowStyle: React.CSSProperties = {
-  marginTop: 10,
+const headerRowStyle: React.CSSProperties = {
+  marginTop: 12,
   display: "flex",
-  justifyContent: "space-between",
-  alignItems: "flex-end",
   gap: 16,
+  justifyContent: "space-between",
+  alignItems: "flex-start",
   flexWrap: "wrap"
 };
 
-const headerActionsStyle: React.CSSProperties = {
-  display: "flex",
-  gap: 10,
-  flexWrap: "wrap"
+const heroTextStyle: React.CSSProperties = {
+  margin: "10px 0 0",
+  maxWidth: 620,
+  lineHeight: 1.6,
+  color: "rgba(247, 251, 254, 0.82)"
 };
 
-const adminLinkStyle: React.CSSProperties = {
-  padding: "10px 14px",
-  borderRadius: 999,
-  border: "1px solid rgba(255,255,255,0.14)",
-  color: "#f7fafc",
+const secondaryLinkStyle: React.CSSProperties = {
+  display: "inline-flex",
+  padding: "11px 14px",
+  borderRadius: 14,
   textDecoration: "none",
-  fontWeight: 700
-};
-
-const summaryRowStyle: React.CSSProperties = {
-  display: "flex",
-  gap: 10,
-  flexWrap: "wrap",
-  marginTop: 16
-};
-
-const summaryChipStyle: React.CSSProperties = {
-  padding: "8px 12px",
-  borderRadius: 999,
-  background: "#2b3944",
-  color: "#dfe7ec",
-  fontSize: 13,
+  background: "rgba(255,255,255,0.08)",
+  color: "#f7fbfe",
   fontWeight: 700
 };
 
 const panelStyle: React.CSSProperties = {
-  marginTop: 20,
-  padding: 18,
-  borderRadius: 22,
-  background: "#f7f9fb",
-  border: "1px solid #d4dde4"
-};
-
-const orderCardStyle: React.CSSProperties = {
-  padding: 18,
-  borderRadius: 20,
-  border: "1px solid #d6dee5",
+  padding: 22,
+  borderRadius: 24,
   background: "#ffffff",
-  boxShadow: "0 10px 24px rgba(32, 47, 61, 0.05)"
+  border: "1px solid #d9e4ec"
 };
 
-const orderHeaderStyle: React.CSSProperties = {
+const mutedTextStyle: React.CSSProperties = {
+  margin: 0,
+  color: "#60707d"
+};
+
+const errorBoxStyle: React.CSSProperties = {
+  padding: "12px 14px",
+  borderRadius: 16,
+  background: "#fff1f1",
+  border: "1px solid #f0c8c8",
+  color: "#a12626"
+};
+
+const chipRowStyle: React.CSSProperties = {
   display: "flex",
-  justifyContent: "space-between",
-  alignItems: "flex-start",
-  gap: 12,
+  gap: 10,
   flexWrap: "wrap"
 };
 
-const orderMetaStyle: React.CSSProperties = {
-  display: "flex",
-  gap: 10,
-  flexWrap: "wrap",
-  fontSize: 13,
-  color: "#62707a"
-};
-
-const orderNumberStyle: React.CSSProperties = {
-  color: "#1f2a33",
-  fontWeight: 700
-};
-
-const orderClientStyle: React.CSSProperties = {
-  margin: "8px 0 0",
-  fontSize: 22,
-  color: "#17232c"
-};
-
-const orderTotalStyle: React.CSSProperties = {
-  fontSize: 28,
-  color: "#244e38",
-  lineHeight: 1
-};
-
-const orderInfoStripStyle: React.CSSProperties = {
-  display: "flex",
-  gap: 8,
-  flexWrap: "wrap",
-  marginTop: 14
-};
-
-const infoPillStyle: React.CSSProperties = {
-  padding: "7px 10px",
+const chipStyle: React.CSSProperties = {
+  padding: "8px 12px",
   borderRadius: 999,
-  background: "#edf2f5",
-  color: "#4c5e6b",
-  fontSize: 12,
-  fontWeight: 700
+  background: "#edf4fb",
+  color: "#25435d",
+  fontWeight: 700,
+  fontSize: 13
 };
 
-const itemsBlockStyle: React.CSSProperties = {
-  marginTop: 14,
-  padding: 14,
-  borderRadius: 16,
-  background: "#f8fafb",
-  border: "1px solid #e0e7ec"
-};
-
-const itemsHeaderStyle: React.CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center"
-};
-
-const itemRowStyle: React.CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  gap: 12,
-  padding: "10px 12px",
-  borderRadius: 12,
-  background: "#ffffff",
-  border: "1px solid #e4ebf0"
-};
-
-const itemTotalStyle: React.CSSProperties = {
-  color: "#244e38",
-  fontWeight: 800,
-  flexShrink: 0
-};
-
-const notesStyle: React.CSSProperties = {
-  marginTop: 14,
-  padding: 14,
-  borderRadius: 14,
-  background: "#f3f6f8",
-  border: "1px solid #e0e7ec"
-};
-
-const emptyStyle: React.CSSProperties = {
+const panelInsetStyle: React.CSSProperties = {
   padding: 18,
-  borderRadius: 18,
-  border: "1px dashed #c8d2da",
-  color: "#5e6c77",
-  background: "#fbfcfd"
+  borderRadius: 20,
+  background: "#f3f7fb",
+  border: "1px solid #dce6ef"
+};
+
+const listStyle: React.CSSProperties = {
+  margin: 0,
+  paddingLeft: 18,
+  color: "#304250",
+  lineHeight: 1.7
 };
