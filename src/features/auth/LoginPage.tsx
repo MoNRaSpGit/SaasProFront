@@ -12,6 +12,8 @@ type LoginFormValues = {
 type LoginResponse = AuthSession;
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://saasproback.onrender.com";
+const CAMIONES_DEMO_EMAIL = "camiones.demo@saaspro.com";
+const CAMIONES_DEMO_PASSWORD = "camiones123";
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -92,68 +94,252 @@ export function LoginPage() {
   };
 
   return (
-    <main style={{ maxWidth: 420, margin: "48px auto", fontFamily: "system-ui, sans-serif", padding: "0 16px" }}>
-      <h1 style={{ marginBottom: 8 }}>Login</h1>
-      <p style={{ marginTop: 0, color: "#555" }}>Ingresa con tu email y password del backend.</p>
-      <button
-        type="button"
-        onClick={() => {
-          setValue("email", "juan@saaspro.com");
-          setValue("password", "12345");
-        }}
-        style={{ marginBottom: 12, padding: "8px 10px" }}
-      >
-        Usar credenciales demo (juan / 12345)
-      </button>
-      <button
-        type="button"
-        onClick={handleDistribuidoraDemoAccess}
-        style={{
-          marginBottom: 16,
-          marginLeft: 8,
-          padding: "8px 10px",
-          borderRadius: 10,
-          border: "1px solid #cfd7e1",
-          background: "#eef4fb",
-          fontWeight: 700
-        }}
-      >
-        Entrar demo Distribuidora
-      </button>
+    <main style={pageStyle}>
+      <section style={heroPanelStyle}>
+        <p style={eyebrowStyle}>SaaS Multi-Modelo</p>
+        <h1 style={heroTitleStyle}>Entrar a SaasPro</h1>
+        <p style={heroBodyStyle}>
+          Ingresa con tu usuario real o usa uno de los accesos rapidos para probar los modelos que ya tenemos listos.
+        </p>
+      </section>
 
-      <form onSubmit={handleSubmit(onSubmit)} style={{ display: "grid", gap: 12 }}>
-        <label>
-          Email
-          <input
-            type="email"
-            placeholder="tu@email.com"
-            style={{ width: "100%", padding: 10, marginTop: 4 }}
-            {...register("email", { required: "Email requerido" })}
-          />
-        </label>
-        {errors.email ? <small style={{ color: "crimson" }}>{errors.email.message}</small> : null}
+      <section style={cardStyle}>
+        <div style={{ display: "grid", gap: 8 }}>
+          <h2 style={{ margin: 0, fontSize: 24, color: "#182433" }}>Login</h2>
+          <p style={{ margin: 0, color: "#5f6a75", lineHeight: 1.5 }}>
+            Usa tu email y password del backend. Los accesos demo son solo temporales para probar.
+          </p>
+        </div>
 
-        <label>
-          Password
-          <input
-            type="password"
-            placeholder="********"
-            style={{ width: "100%", padding: 10, marginTop: 4 }}
-            {...register("password", { required: "Password requerido" })}
-          />
-        </label>
-        {errors.password ? <small style={{ color: "crimson" }}>{errors.password.message}</small> : null}
+        <div style={demoGridStyle}>
+          <button
+            type="button"
+            onClick={() => {
+              setValue("email", "juan@saaspro.com");
+              setValue("password", "12345");
+            }}
+            style={demoButtonStyle}
+          >
+            <strong style={demoTitleStyle}>Demo base</strong>
+            <span style={demoTextStyle}>juan@saaspro.com / 12345</span>
+          </button>
 
-        <button type="submit" disabled={isSubmitting} style={{ padding: 12, fontWeight: 600 }}>
-          {isSubmitting ? "Entrando..." : "Iniciar sesion"}
-        </button>
-      </form>
+          <button type="button" onClick={handleDistribuidoraDemoAccess} style={distribuidoraDemoButtonStyle}>
+            <strong style={demoTitleStyle}>Distribuidora</strong>
+            <span style={demoTextStyle}>entra directo al flujo demo</span>
+          </button>
 
-      {apiError ? <p style={{ color: "crimson", marginTop: 12 }}>{apiError}</p> : null}
-      {loggedUser ? <p style={{ color: "green", marginTop: 12 }}>Login OK: {loggedUser.email}</p> : null}
-      <p style={{ marginTop: 12 }}>
-        No tenes cuenta? <Link to="/register">Crear cuenta</Link>
-      </p>
+          <button
+            type="button"
+            onClick={() => {
+              setValue("email", CAMIONES_DEMO_EMAIL);
+              setValue("password", CAMIONES_DEMO_PASSWORD);
+            }}
+            style={camionesDemoButtonStyle}
+          >
+            <strong style={demoTitleStyle}>Camiones</strong>
+            <span style={demoTextStyle}>{CAMIONES_DEMO_EMAIL}</span>
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit(onSubmit)} style={formStyle}>
+          <label style={fieldWrapStyle}>
+            <span style={fieldLabelStyle}>Email</span>
+            <input
+              type="email"
+              placeholder="tu@email.com"
+              style={inputStyle}
+              {...register("email", { required: "Email requerido" })}
+            />
+          </label>
+          {errors.email ? <small style={errorTextStyle}>{errors.email.message}</small> : null}
+
+          <label style={fieldWrapStyle}>
+            <span style={fieldLabelStyle}>Password</span>
+            <input
+              type="password"
+              placeholder="********"
+              style={inputStyle}
+              {...register("password", { required: "Password requerido" })}
+            />
+          </label>
+          {errors.password ? <small style={errorTextStyle}>{errors.password.message}</small> : null}
+
+          <button type="submit" disabled={isSubmitting} style={submitButtonStyle}>
+            {isSubmitting ? "Entrando..." : "Iniciar sesion"}
+          </button>
+        </form>
+
+        {apiError ? <div style={errorBoxStyle}>{apiError}</div> : null}
+        {loggedUser ? <div style={successBoxStyle}>Login OK: {loggedUser.email}</div> : null}
+
+        <p style={{ margin: 0, color: "#5f6a75" }}>
+          No tenes cuenta?{" "}
+          <Link to="/register" style={inlineLinkStyle}>
+            Crear cuenta
+          </Link>
+        </p>
+      </section>
     </main>
   );
 }
+
+const pageStyle: React.CSSProperties = {
+  minHeight: "100vh",
+  padding: "32px 16px 48px",
+  fontFamily: "system-ui, sans-serif",
+  background:
+    "radial-gradient(circle at top left, rgba(223, 232, 244, 0.95), transparent 28%), linear-gradient(180deg, #f5f8fb 0%, #ecf2f8 100%)",
+  display: "grid",
+  gap: 18,
+  alignContent: "center",
+  justifyItems: "center"
+};
+
+const heroPanelStyle: React.CSSProperties = {
+  width: "100%",
+  maxWidth: 520,
+  padding: "24px 24px 26px",
+  borderRadius: 28,
+  background: "#172433",
+  color: "#f7fafc",
+  boxShadow: "0 24px 60px rgba(23, 36, 51, 0.22)"
+};
+
+const eyebrowStyle: React.CSSProperties = {
+  margin: 0,
+  fontSize: 12,
+  textTransform: "uppercase",
+  letterSpacing: "0.16em",
+  color: "rgba(247, 250, 252, 0.72)"
+};
+
+const heroTitleStyle: React.CSSProperties = {
+  margin: "10px 0 8px",
+  fontSize: 36,
+  lineHeight: 1.05
+};
+
+const heroBodyStyle: React.CSSProperties = {
+  margin: 0,
+  color: "rgba(247, 250, 252, 0.82)",
+  lineHeight: 1.6
+};
+
+const cardStyle: React.CSSProperties = {
+  width: "100%",
+  maxWidth: 520,
+  padding: 24,
+  borderRadius: 28,
+  background: "#ffffff",
+  border: "1px solid #dbe4ec",
+  boxShadow: "0 20px 44px rgba(27, 54, 85, 0.08)",
+  display: "grid",
+  gap: 18
+};
+
+const demoGridStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 10
+};
+
+const demoButtonStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 4,
+  width: "100%",
+  textAlign: "left",
+  padding: "14px 16px",
+  borderRadius: 18,
+  border: "1px solid #d6dde6",
+  background: "#f7fafc",
+  cursor: "pointer"
+};
+
+const distribuidoraDemoButtonStyle: React.CSSProperties = {
+  ...demoButtonStyle,
+  border: "1px solid #cfe0f4",
+  background: "#eef4fb"
+};
+
+const camionesDemoButtonStyle: React.CSSProperties = {
+  ...demoButtonStyle,
+  border: "1px solid #e5d3a9",
+  background: "#fff4df"
+};
+
+const demoTitleStyle: React.CSSProperties = {
+  fontSize: 15,
+  color: "#182433"
+};
+
+const demoTextStyle: React.CSSProperties = {
+  fontSize: 13,
+  color: "#60707d"
+};
+
+const formStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 12
+};
+
+const fieldWrapStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 8
+};
+
+const fieldLabelStyle: React.CSSProperties = {
+  fontSize: 14,
+  fontWeight: 700,
+  color: "#3d4a57"
+};
+
+const inputStyle: React.CSSProperties = {
+  width: "100%",
+  minHeight: 52,
+  padding: "14px 16px",
+  borderRadius: 16,
+  border: "1px solid #d5dde6",
+  background: "#fbfdff",
+  fontSize: 16,
+  boxSizing: "border-box"
+};
+
+const submitButtonStyle: React.CSSProperties = {
+  minHeight: 54,
+  padding: "14px 16px",
+  borderRadius: 16,
+  border: "1px solid rgba(20, 47, 71, 0.2)",
+  background: "#172433",
+  color: "#f7fafc",
+  fontWeight: 800,
+  fontSize: 16,
+  cursor: "pointer",
+  boxShadow: "0 16px 28px rgba(23, 36, 51, 0.18)"
+};
+
+const errorTextStyle: React.CSSProperties = {
+  color: "#b42318",
+  marginTop: -4
+};
+
+const errorBoxStyle: React.CSSProperties = {
+  padding: "12px 14px",
+  borderRadius: 16,
+  background: "#fff1f1",
+  border: "1px solid #f0c8c8",
+  color: "#a12626"
+};
+
+const successBoxStyle: React.CSSProperties = {
+  padding: "12px 14px",
+  borderRadius: 16,
+  background: "#eef8f1",
+  border: "1px solid #cde7d4",
+  color: "#21613d"
+};
+
+const inlineLinkStyle: React.CSSProperties = {
+  color: "#1f4f7b",
+  fontWeight: 700,
+  textDecoration: "none"
+};
