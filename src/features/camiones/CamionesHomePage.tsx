@@ -15,7 +15,6 @@ import {
 import { CamionesClient, CamionesPlace, CamionesTrip } from "./camiones.types";
 
 type CamionesTab = "cliente" | "viaje" | "registro";
-type ClientModalState = { mode: "create" | "edit"; clientId: number | null } | null;
 type PlaceModalState = { mode: "create" | "edit"; placeId: number | null } | null;
 type TripFilter = "all" | "pending" | "paid";
 
@@ -67,7 +66,7 @@ export function CamionesHomePage() {
   const [savingPlace, setSavingPlace] = useState(false);
   const [markingPaidId, setMarkingPaidId] = useState<number | null>(null);
   const [archivingPlaceId, setArchivingPlaceId] = useState<number | null>(null);
-  const [clientModalState, setClientModalState] = useState<ClientModalState>(null);
+  const [clientModalOpen, setClientModalOpen] = useState(false);
   const [clientDraftName, setClientDraftName] = useState("");
   const [clientDraftPhone, setClientDraftPhone] = useState("");
   const [placeModalState, setPlaceModalState] = useState<PlaceModalState>(null);
@@ -228,7 +227,7 @@ export function CamionesHomePage() {
   function openClientCreateModal() {
     setClientDraftName(clientSearch.trim());
     setClientDraftPhone("");
-    setClientModalState({ mode: "create", clientId: null });
+    setClientModalOpen(true);
   }
 
   function closeClientModal() {
@@ -236,7 +235,7 @@ export function CamionesHomePage() {
       return;
     }
 
-    setClientModalState(null);
+    setClientModalOpen(false);
     setClientDraftName("");
     setClientDraftPhone("");
   }
@@ -684,7 +683,7 @@ export function CamionesHomePage() {
         ) : null}
       </div>
 
-      {clientModalState ? (
+      {clientModalOpen ? (
         <div style={modalOverlayStyle} onClick={closeClientModal}>
           <section style={modalCardStyle} onClick={(event) => event.stopPropagation()}>
             <div style={{ display: "grid", gap: 6 }}>
