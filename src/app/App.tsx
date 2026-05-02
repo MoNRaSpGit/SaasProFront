@@ -1,5 +1,6 @@
 import { Link, Route, Routes } from "react-router-dom";
 import { DashboardPage } from "../features/auth/DashboardPage";
+import { CamionesHomePage } from "../features/camiones/CamionesHomePage";
 import { DistribuidoraAdminPage } from "../features/distribuidora/DistribuidoraAdminPage";
 import { DistribuidoraHomePage } from "../features/distribuidora/DistribuidoraHomePage";
 import { LoginPage } from "../features/auth/LoginPage";
@@ -92,6 +93,17 @@ function HomePage() {
           </article>
 
           <article style={homeCardStyle}>
+            <p style={eyebrowStyle}>Modelo</p>
+            <h2 style={cardTitleStyle}>Camiones</h2>
+            <p style={cardBodyStyle}>
+              Base visual mobile-first para viajes, registro operativo y futuros flujos SaaS del cliente.
+            </p>
+            <Link to="/camiones" style={cardLinkStyle}>
+              Abrir modelo
+            </Link>
+          </article>
+
+          <article style={homeCardStyle}>
             <p style={eyebrowStyle}>Estado</p>
             <h2 style={cardTitleStyle}>Health</h2>
             <p style={cardBodyStyle}>Chequeo simple del frontend para validar que la app esta levantando bien.</p>
@@ -148,6 +160,14 @@ export function App() {
         element={
           <ProtectedRoute>
             <DistribuidoraAdminPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/camiones"
+        element={
+          <ProtectedRoute>
+            <CamionesHomePage />
           </ProtectedRoute>
         }
       />
