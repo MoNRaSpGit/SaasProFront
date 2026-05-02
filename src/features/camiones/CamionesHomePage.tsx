@@ -2,17 +2,22 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import { ModelUserMenu } from "../../shared/components/ModelUserMenu";
 import {
+  archiveCamionesPlace,
   createCamionesClient as createCamionesClientRequest,
   createCamionesPlace as createCamionesPlaceRequest,
   createCamionesTrip,
   listCamionesClients,
   listCamionesPlaces,
   listCamionesTrips,
-  markCamionesTripPaid as markCamionesTripPaidRequest
+  markCamionesTripPaid as markCamionesTripPaidRequest,
+  updateCamionesPlace
 } from "./camiones.client";
 import { CamionesClient, CamionesPlace, CamionesTrip } from "./camiones.types";
 
 type CamionesTab = "cliente" | "viaje" | "registro";
+type ClientModalState = { mode: "create" | "edit"; clientId: number | null } | null;
+type PlaceModalState = { mode: "create" | "edit"; placeId: number | null } | null;
+type TripFilter = "all" | "pending" | "paid";
 
 function getTodayDate() {
   const now = new Date();
@@ -32,6 +37,10 @@ function formatDateLabel(value: string) {
   return `${day}/${month}/${year}`;
 }
 
+function normalizeText(value: string) {
+  return value.trim().toLowerCase();
+}
+
 export function CamionesHomePage() {
   const clientInputRef = useRef<HTMLInputElement | null>(null);
   const placeInputRef = useRef<HTMLInputElement | null>(null);
@@ -46,6 +55,8 @@ export function CamionesHomePage() {
   const [placeSearch, setPlaceSearch] = useState("");
   const [selectedPlace, setSelectedPlace] = useState<CamionesPlace | null>(null);
   const [kilometers, setKilometers] = useState("");
+  const [tripSearch, setTripSearch] = useState("");
+  const [tripFilter, setTripFilter] = useState<TripFilter>("all");
   const [clientsLoading, setClientsLoading] = useState(true);
   const [tripsLoading, setTripsLoading] = useState(false);
   const [tripsLoaded, setTripsLoaded] = useState(false);
@@ -53,10 +64,14 @@ export function CamionesHomePage() {
   const [placesLoaded, setPlacesLoaded] = useState(false);
   const [savingTrip, setSavingTrip] = useState(false);
   const [savingClient, setSavingClient] = useState(false);
+  const [savingPlace, setSavingPlace] = useState(false);
   const [markingPaidId, setMarkingPaidId] = useState<number | null>(null);
-  const [clientModalOpen, setClientModalOpen] = useState(false);
+  const [archivingPlaceId, setArchivingPlaceId] = useState<number | null>(null);
+  const [clientModalState, setClientModalState] = useState<ClientModalState>(null);
   const [clientDraftName, setClientDraftName] = useState("");
   const [clientDraftPhone, setClientDraftPhone] = useState("");
+  const [placeModalState, setPlaceModalState] = useState<PlaceModalState>(null);
+  const [placeDraftName, setPlaceDraftName] = useState("");
 
   useEffect(() => {
     void loadInitialClients();
@@ -155,22 +170,40 @@ export function CamionesHomePage() {
   }, [trips]);
 
   const filteredClients = useMemo(() => {
-    const query = clientSearch.trim().toLowerCase();
+    const query = normalizeText(clientSearch);
     if (!query) {
       return clients.slice(0, 6);
     }
 
-    return clients.filter((client) => client.name.toLowerCase().includes(query));
+    return clients.filter((client) => {
+      const phone = client.phone?.toLowerCase() || "";
+      return client.name.toLowerCase().includes(query) || phone.includes(query);
+    });
   }, [clientSearch, clients]);
 
   const filteredPlaces = useMemo(() => {
-    const query = placeSearch.trim().toLowerCase();
+    const query = normalizeText(placeSearch);
     if (!query) {
       return places.slice(0, 8);
     }
 
     return places.filter((place) => place.name.toLowerCase().includes(query));
   }, [placeSearch, places]);
+
+  const filteredTrips = useMemo(() => {
+    const query = normalizeText(tripSearch);
+    return trips.filter((trip) => {
+      if (tripFilter !== "all" && trip.status !== tripFilter) {
+        return false;
+      }
+
+      if (!query) {
+        return true;
+      }
+
+      return trip.clientName.toLowerCase().includes(query) || trip.place.toLowerCase().includes(query);
+    });
+  }, [tripFilter, tripSearch, trips]);
 
   function clearTripForm() {
     setTripDate(getTodayDate());
@@ -186,7 +219,48 @@ export function CamionesHomePage() {
     setTab("viaje");
   }
 
-  async function handleCreateClient() {
+  function selectPlace(place: CamionesPlace) {
+    setSelectedPlace(place);
+    setPlaceSearch(place.name);
+    kilometersInputRef.current?.focus();
+  }
+
+  function openClientCreateModal() {
+    setClientDraftName(clientSearch.trim());
+    setClientDraftPhone("");
+    setClientModalState({ mode: "create", clientId: null });
+  }
+
+  function closeClientModal() {
+    if (savingClient) {
+      return;
+    }
+
+    setClientModalState(null);
+    setClientDraftName("");
+    setClientDraftPhone("");
+  }
+
+  function openPlaceCreateModal() {
+    setPlaceDraftName(placeSearch.trim());
+    setPlaceModalState({ mode: "create", placeId: null });
+  }
+
+  function openPlaceEditModal(place: CamionesPlace) {
+    setPlaceDraftName(place.name);
+    setPlaceModalState({ mode: "edit", placeId: place.id });
+  }
+
+  function closePlaceModal() {
+    if (savingPlace) {
+      return;
+    }
+
+    setPlaceModalState(null);
+    setPlaceDraftName("");
+  }
+
+  async function handleSaveClient() {
     const name = clientDraftName.trim();
     if (!name) {
       toast.error("Escribe el nombre del cliente");
@@ -200,38 +274,69 @@ export function CamionesHomePage() {
         name,
         phone: clientDraftPhone.trim() || undefined
       });
+
       await refreshClients();
       setSelectedClient(payload.item);
       setClientSearch(payload.item.name);
-      setClientDraftName("");
-      setClientDraftPhone("");
-      setClientModalOpen(false);
-      clearTripForm();
+      closeClientModal();
       toast.success(`Cliente agregado: ${payload.item.name}`);
-      setTab("viaje");
+
+      if (tab === "cliente") {
+        clearTripForm();
+        setTab("viaje");
+      }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo crear el cliente");
+      toast.error(error instanceof Error ? error.message : "No se pudo guardar el cliente");
     } finally {
       setSavingClient(false);
     }
   }
 
-  async function handleCreatePlace() {
-    const name = placeSearch.trim();
+  async function handleSavePlace() {
+    const name = placeDraftName.trim();
     if (!name) {
       toast.error("Escribe el lugar");
       return;
     }
 
+    setSavingPlace(true);
+
     try {
-      const payload = await createCamionesPlaceRequest({ name });
+      const payload =
+        placeModalState?.mode === "edit" && placeModalState.placeId
+          ? await updateCamionesPlace(placeModalState.placeId, { name })
+          : await createCamionesPlaceRequest({ name });
+
       await refreshPlaces();
       setSelectedPlace(payload.item);
       setPlaceSearch(payload.item.name);
-      toast.success(`Lugar agregado: ${payload.item.name}`);
+      closePlaceModal();
+      toast.success(placeModalState?.mode === "edit" ? "Lugar actualizado" : `Lugar agregado: ${payload.item.name}`);
       kilometersInputRef.current?.focus();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo crear el lugar");
+      toast.error(error instanceof Error ? error.message : "No se pudo guardar el lugar");
+    } finally {
+      setSavingPlace(false);
+    }
+  }
+
+  async function handleArchivePlace(place: CamionesPlace) {
+    setArchivingPlaceId(place.id);
+
+    try {
+      await archiveCamionesPlace(place.id);
+      await refreshPlaces();
+
+      if (selectedPlace?.id === place.id) {
+        setSelectedPlace(null);
+        setPlaceSearch("");
+      }
+
+      toast.success(`Lugar archivado: ${place.name}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo archivar el lugar");
+    } finally {
+      setArchivingPlaceId(null);
     }
   }
 
@@ -242,33 +347,13 @@ export function CamionesHomePage() {
       return;
     }
 
-    const existingClient = clients.find((client) => client.name.toLowerCase() === clientName.toLowerCase());
+    const existingClient = clients.find((client) => normalizeText(client.name) === normalizeText(clientName));
     if (existingClient) {
       selectClient(existingClient);
       return;
     }
 
-    setSavingClient(true);
-
-    try {
-      const payload = await createCamionesClientRequest({ name: clientName });
-      await refreshClients();
-      setSelectedClient(payload.item);
-      setClientSearch(payload.item.name);
-      clearTripForm();
-      toast.success(`Cliente agregado: ${payload.item.name}`);
-      setTab("viaje");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo crear el cliente");
-    } finally {
-      setSavingClient(false);
-    }
-  }
-
-  function selectPlace(place: CamionesPlace) {
-    setSelectedPlace(place);
-    setPlaceSearch(place.name);
-    kilometersInputRef.current?.focus();
+    openClientCreateModal();
   }
 
   async function handleSaveTrip() {
@@ -309,6 +394,8 @@ export function CamionesHomePage() {
       setClientSearch("");
       setSelectedClient(null);
       clearTripForm();
+      setTripFilter("pending");
+      setTripSearch("");
       setTab("registro");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo guardar el viaje");
@@ -329,12 +416,6 @@ export function CamionesHomePage() {
     } finally {
       setMarkingPaidId(null);
     }
-  }
-
-  function openClientModal() {
-    setClientDraftName(clientSearch.trim());
-    setClientDraftPhone("");
-    setClientModalOpen(true);
   }
 
   return (
@@ -391,13 +472,7 @@ export function CamionesHomePage() {
                     placeholder="Escribe el cliente"
                     style={inputStyle}
                   />
-                  <button
-                    type="button"
-                    onClick={openClientModal}
-                    style={plusButtonStyle}
-                    aria-label="Agregar cliente"
-                    disabled={savingClient}
-                  >
+                  <button type="button" onClick={openClientCreateModal} style={plusButtonStyle} aria-label="Agregar cliente">
                     +
                   </button>
                 </div>
@@ -406,29 +481,33 @@ export function CamionesHomePage() {
               <div style={{ display: "grid", gap: 8 }}>
                 {clientsLoading ? <div style={emptyBoxStyle}>Cargando clientes...</div> : null}
                 {filteredClients.map((client) => (
-                  <button
-                    key={client.id}
-                    type="button"
-                    onClick={() => selectClient(client)}
-                    style={
-                      selectedClient?.id === client.id || clientSearch.trim().toLowerCase() === client.name.toLowerCase()
-                        ? selectedButtonStyle
-                        : pickerButtonStyle
-                    }
-                  >
-                    <span style={clientRowStyle}>
-                      <span>{client.name}</span>
-                      {clientPendingTripMap.get(client.id) ? (
-                        <span style={clientPendingStatusStyle} aria-label="Cliente con pendiente">
-                          {"\u2715"}
+                  <div key={client.id} style={entityWrapStyle}>
+                    <button
+                      type="button"
+                      onClick={() => selectClient(client)}
+                      style={
+                        selectedClient?.id === client.id || normalizeText(clientSearch) === normalizeText(client.name)
+                          ? selectedButtonStyle
+                          : pickerButtonStyle
+                      }
+                    >
+                      <span style={clientRowStyle}>
+                        <span style={{ display: "grid", gap: 4 }}>
+                          <span>{client.name}</span>
+                          <span style={clientPhoneStyle}>{client.phone || "Sin telefono"}</span>
                         </span>
-                      ) : (
-                        <span style={clientOkStatusStyle} aria-label="Cliente sin pendientes">
-                          {"\u2713"}
-                        </span>
-                      )}
-                    </span>
-                  </button>
+                        {clientPendingTripMap.get(client.id) ? (
+                          <span style={clientPendingStatusStyle} aria-label="Cliente con pendiente">
+                            {"\u2715"}
+                          </span>
+                        ) : (
+                          <span style={clientOkStatusStyle} aria-label="Cliente sin pendientes">
+                            {"\u2713"}
+                          </span>
+                        )}
+                      </span>
+                    </button>
+                  </div>
                 ))}
                 {!clientsLoading && filteredClients.length === 0 ? (
                   <div style={emptyBoxStyle}>No hay clientes para esa busqueda.</div>
@@ -475,7 +554,7 @@ export function CamionesHomePage() {
                     placeholder="Ej: Piedra Sola"
                     style={inputStyle}
                   />
-                  <button type="button" onClick={() => void handleCreatePlace()} style={plusButtonStyle} aria-label="Agregar lugar">
+                  <button type="button" onClick={openPlaceCreateModal} style={plusButtonStyle} aria-label="Agregar lugar">
                     +
                   </button>
                 </div>
@@ -484,18 +563,32 @@ export function CamionesHomePage() {
               <div style={{ display: "grid", gap: 8 }}>
                 {placesLoading ? <div style={emptyBoxStyle}>Cargando lugares...</div> : null}
                 {filteredPlaces.map((place) => (
-                  <button
-                    key={place.id}
-                    type="button"
-                    onClick={() => selectPlace(place)}
-                    style={
-                      selectedPlace?.id === place.id || placeSearch.trim().toLowerCase() === place.name.toLowerCase()
-                        ? selectedButtonStyle
-                        : pickerButtonStyle
-                    }
-                  >
-                    {place.name}
-                  </button>
+                  <div key={place.id} style={entityWrapStyle}>
+                    <button
+                      type="button"
+                      onClick={() => selectPlace(place)}
+                      style={
+                        selectedPlace?.id === place.id || normalizeText(placeSearch) === normalizeText(place.name)
+                          ? selectedButtonStyle
+                          : pickerButtonStyle
+                      }
+                    >
+                      {place.name}
+                    </button>
+                    <div style={entityActionsStyle}>
+                      <button type="button" onClick={() => openPlaceEditModal(place)} style={miniActionButtonStyle}>
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleArchivePlace(place)}
+                        style={miniDangerButtonStyle}
+                        disabled={archivingPlaceId === place.id}
+                      >
+                        {archivingPlaceId === place.id ? "Archivando..." : "Archivar"}
+                      </button>
+                    </div>
+                  </div>
                 ))}
                 {!placesLoading && filteredPlaces.length === 0 ? (
                   <div style={emptyBoxStyle}>No hay lugares para esa busqueda.</div>
@@ -534,9 +627,36 @@ export function CamionesHomePage() {
             </div>
 
             <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
+              <label style={fieldWrapStyle}>
+                <span style={fieldLabelStyle}>Buscar</span>
+                <input
+                  type="text"
+                  value={tripSearch}
+                  onChange={(event) => setTripSearch(event.target.value)}
+                  placeholder="Cliente o lugar"
+                  style={inputStyle}
+                />
+              </label>
+
+              <div style={filterWrapStyle}>
+                <button type="button" onClick={() => setTripFilter("all")} style={tripFilter === "all" ? activeChipStyle : chipStyle}>
+                  Todos
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTripFilter("pending")}
+                  style={tripFilter === "pending" ? activeChipStyle : chipStyle}
+                >
+                  Pendientes
+                </button>
+                <button type="button" onClick={() => setTripFilter("paid")} style={tripFilter === "paid" ? activeChipStyle : chipStyle}>
+                  Pagados
+                </button>
+              </div>
+
               {tripsLoading ? <div style={emptyBoxStyle}>Cargando registro...</div> : null}
-              {!tripsLoading && trips.length === 0 ? <div style={emptyBoxStyle}>Todavia no hay viajes registrados.</div> : null}
-              {trips.map((trip) => (
+              {!tripsLoading && filteredTrips.length === 0 ? <div style={emptyBoxStyle}>Todavia no hay viajes registrados.</div> : null}
+              {filteredTrips.map((trip) => (
                 <article key={trip.id} style={trip.status === "paid" ? historyCardStyle : tripCardStyle}>
                   <div style={{ display: "grid", gap: 4 }}>
                     <strong style={{ fontSize: 19, color: "#2f241e" }}>{trip.clientName}</strong>
@@ -564,13 +684,15 @@ export function CamionesHomePage() {
         ) : null}
       </div>
 
-      {clientModalOpen ? (
-        <div style={modalOverlayStyle} onClick={() => setClientModalOpen(false)}>
+      {clientModalState ? (
+        <div style={modalOverlayStyle} onClick={closeClientModal}>
           <section style={modalCardStyle} onClick={(event) => event.stopPropagation()}>
             <div style={{ display: "grid", gap: 6 }}>
-              <h3 style={{ margin: 0, fontSize: 24, color: "#2f241e" }}>Nuevo cliente</h3>
+              <h3 style={{ margin: 0, fontSize: 24, color: "#2f241e" }}>
+                Nuevo cliente
+              </h3>
               <p style={{ margin: 0, color: "#68594f", lineHeight: 1.5 }}>
-                Cargá los datos base del cliente para empezar a usarlo en viajes.
+                Carga los datos base del cliente para empezar a usarlo en viajes.
               </p>
             </div>
 
@@ -599,11 +721,48 @@ export function CamionesHomePage() {
             </div>
 
             <div style={modalActionsStyle}>
-              <button type="button" onClick={() => setClientModalOpen(false)} style={modalCancelButtonStyle}>
+              <button type="button" onClick={closeClientModal} style={modalCancelButtonStyle}>
                 Cancelar
               </button>
-              <button type="button" onClick={() => void handleCreateClient()} style={saveButtonStyle} disabled={savingClient}>
+              <button type="button" onClick={() => void handleSaveClient()} style={saveButtonStyle} disabled={savingClient}>
                 {savingClient ? "Guardando..." : "Guardar cliente"}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {placeModalState ? (
+        <div style={modalOverlayStyle} onClick={closePlaceModal}>
+          <section style={modalCardStyle} onClick={(event) => event.stopPropagation()}>
+            <div style={{ display: "grid", gap: 6 }}>
+              <h3 style={{ margin: 0, fontSize: 24, color: "#2f241e" }}>
+                {placeModalState.mode === "edit" ? "Editar lugar" : "Nuevo lugar"}
+              </h3>
+              <p style={{ margin: 0, color: "#68594f", lineHeight: 1.5 }}>
+                Guarda el lugar para reutilizarlo en viajes siguientes.
+              </p>
+            </div>
+
+            <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
+              <label style={fieldWrapStyle}>
+                <span style={fieldLabelStyle}>Nombre</span>
+                <input
+                  type="text"
+                  value={placeDraftName}
+                  onChange={(event) => setPlaceDraftName(event.target.value)}
+                  placeholder="Ej: Piedra Sola"
+                  style={inputStyle}
+                />
+              </label>
+            </div>
+
+            <div style={modalActionsStyle}>
+              <button type="button" onClick={closePlaceModal} style={modalCancelButtonStyle}>
+                Cancelar
+              </button>
+              <button type="button" onClick={() => void handleSavePlace()} style={saveButtonStyle} disabled={savingPlace}>
+                {savingPlace ? "Guardando..." : placeModalState.mode === "edit" ? "Guardar cambios" : "Guardar lugar"}
               </button>
             </div>
           </section>
@@ -737,11 +896,22 @@ const selectedButtonStyle: React.CSSProperties = {
   boxShadow: "0 12px 24px rgba(201, 133, 50, 0.14)"
 };
 
+const entityWrapStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 6
+};
+
 const clientRowStyle: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
   gap: 12
+};
+
+const clientPhoneStyle: React.CSSProperties = {
+  fontSize: 13,
+  color: "#7a6a5d",
+  fontWeight: 500
 };
 
 const clientPendingStatusStyle: React.CSSProperties = {
@@ -772,6 +942,32 @@ const clientOkStatusStyle: React.CSSProperties = {
   boxShadow: "0 8px 16px rgba(36, 81, 58, 0.12)"
 };
 
+const entityActionsStyle: React.CSSProperties = {
+  display: "flex",
+  gap: 8,
+  justifyContent: "flex-end",
+  flexWrap: "wrap"
+};
+
+const miniActionButtonStyle: React.CSSProperties = {
+  minHeight: 36,
+  padding: "8px 12px",
+  borderRadius: 14,
+  border: "1px solid #d8ccbf",
+  background: "#fff8f0",
+  color: "#5d4a3e",
+  fontWeight: 700,
+  fontSize: 13,
+  cursor: "pointer"
+};
+
+const miniDangerButtonStyle: React.CSSProperties = {
+  ...miniActionButtonStyle,
+  border: "1px solid #f0cbc4",
+  background: "#fff2ef",
+  color: "#8a4336"
+};
+
 const saveButtonStyle: React.CSSProperties = {
   minHeight: 56,
   padding: "15px 16px",
@@ -796,6 +992,30 @@ const secondaryActionButtonStyle: React.CSSProperties = {
   fontSize: 16,
   boxShadow: "0 8px 16px rgba(73, 48, 34, 0.08)",
   cursor: "pointer"
+};
+
+const filterWrapStyle: React.CSSProperties = {
+  display: "flex",
+  gap: 8,
+  flexWrap: "wrap"
+};
+
+const chipStyle: React.CSSProperties = {
+  minHeight: 40,
+  padding: "8px 14px",
+  borderRadius: 999,
+  border: "1px solid #d8ccbf",
+  background: "#fff8f0",
+  color: "#5d4a3e",
+  fontWeight: 700,
+  cursor: "pointer"
+};
+
+const activeChipStyle: React.CSSProperties = {
+  ...chipStyle,
+  border: "1px solid #38281f",
+  background: "#38281f",
+  color: "#fbf5ec"
 };
 
 const tripCardStyle: React.CSSProperties = {
