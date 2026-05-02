@@ -1,7 +1,6 @@
 import { fetchWithAuth } from "../auth/auth.client";
 import { CamionesClientsResponse, CamionesTripsResponse } from "./camiones.types";
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://saasproback.onrender.com";
+import { API_BASE_URL } from "../../shared/config/api";
 
 async function readJson<T>(response: Response): Promise<T> {
   const payload = (await response.json()) as T & { message?: string | string[] };

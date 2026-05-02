@@ -22,6 +22,7 @@ export type TenantContext = {
 
 export type StoredAuthUser = AuthUser & {
   tenantContext: TenantContext | null;
+  isDemoSession?: boolean;
 };
 
 export type AuthTokens = {
@@ -36,4 +37,5 @@ export type AuthSession = {
   user: AuthUser;
   tenantContext: TenantContext | null;
   tokens: AuthTokens;
+  isDemoSession?: boolean;
 };

@@ -1,9 +1,11 @@
 import { AuthSession, AuthTokens, StoredAuthUser } from "./auth.types";
+import { API_BASE_URL } from "../../shared/config/api";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://saasproback.onrender.com";
 const ACCESS_TOKEN_KEY = "saaspro_access_token";
 const REFRESH_TOKEN_KEY = "saaspro_refresh_token";
 const USER_KEY = "saaspro_user";
+const DEMO_SESSION_PREFIX = "demo-";
+const DEMO_AUTH_ENABLED = import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEMO_AUTH === "true";
 
 export function saveSession(session: AuthSession) {
   localStorage.setItem(ACCESS_TOKEN_KEY, session.tokens.accessToken);
@@ -12,7 +14,8 @@ export function saveSession(session: AuthSession) {
     USER_KEY,
     JSON.stringify({
       ...session.user,
-      tenantContext: session.tenantContext
+      tenantContext: session.tenantContext,
+      isDemoSession: session.isDemoSession === true
     } satisfies StoredAuthUser)
   );
 }
@@ -33,6 +36,14 @@ export function getAccessToken() {
 
 export function getRefreshToken() {
   return localStorage.getItem(REFRESH_TOKEN_KEY);
+}
+
+export function isDemoAuthEnabled() {
+  return DEMO_AUTH_ENABLED;
+}
+
+export function isDemoToken(token: string | null) {
+  return Boolean(token && token.startsWith(DEMO_SESSION_PREFIX));
 }
 
 export async function refreshSession(): Promise<AuthTokens | null> {

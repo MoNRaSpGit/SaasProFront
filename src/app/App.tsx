@@ -142,7 +142,7 @@ export function App() {
       <Route
         path="/pos"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute requiredModule="pos">
             <PosHomePage />
           </ProtectedRoute>
         }
@@ -150,7 +150,7 @@ export function App() {
       <Route
         path="/distribuidora"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute requiredModule="distribuidora">
             <DistribuidoraHomePage />
           </ProtectedRoute>
         }
@@ -158,7 +158,7 @@ export function App() {
       <Route
         path="/distribuidora/admin"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute requiredModule="distribuidora">
             <DistribuidoraAdminPage />
           </ProtectedRoute>
         }
@@ -166,7 +166,7 @@ export function App() {
       <Route
         path="/camiones"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute requiredModule="camiones">
             <CamionesHomePage />
           </ProtectedRoute>
         }

@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
+import { API_BASE_URL } from "../../shared/config/api";
 import { saveSession } from "./auth.client";
+import { getDefaultAuthenticatedRoute } from "./module-routing";
 import { AuthSession } from "./auth.types";
 
 type RegisterFormValues = {
@@ -10,8 +12,6 @@ type RegisterFormValues = {
   email: string;
   password: string;
 };
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://saasproback.onrender.com";
 
 export function RegisterPage() {
   const navigate = useNavigate();
@@ -47,8 +47,9 @@ export function RegisterPage() {
         return;
       }
 
-      saveSession(payload as AuthSession);
-      navigate("/dashboard");
+      const session = payload as AuthSession;
+      saveSession(session);
+      navigate(getDefaultAuthenticatedRoute({ ...session.user, tenantContext: session.tenantContext }));
     } catch {
       setApiError("No se pudo conectar al backend. Revisar CORS/URL/API.");
     }

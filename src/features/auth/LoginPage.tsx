@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
-import { saveSession } from "./auth.client";
+import { API_BASE_URL } from "../../shared/config/api";
+import { isDemoAuthEnabled, saveSession } from "./auth.client";
+import { getDefaultAuthenticatedRoute } from "./module-routing";
 import { AuthSession } from "./auth.types";
 
 type LoginFormValues = {
@@ -11,9 +13,9 @@ type LoginFormValues = {
 
 type LoginResponse = AuthSession;
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://saasproback.onrender.com";
 const CAMIONES_DEMO_EMAIL = "camiones.demo@saaspro.com";
 const CAMIONES_DEMO_PASSWORD = "camiones123";
+const DEMO_AUTH_ENABLED = isDemoAuthEnabled();
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -50,7 +52,7 @@ export function LoginPage() {
       const data = payload as LoginResponse;
       saveSession(data);
       setLoggedUser(data.user);
-      navigate("/dashboard");
+      navigate(getDefaultAuthenticatedRoute({ ...data.user, tenantContext: data.tenantContext }));
     } catch {
       setApiError("No se pudo conectar al backend. Revisar CORS/URL/API.");
     }
@@ -84,13 +86,14 @@ export function LoginPage() {
         tokenType: "Bearer",
         accessTtl: "24h",
         refreshTtl: "7d"
-      }
+      },
+      isDemoSession: true
     };
 
     saveSession(demoSession);
     setApiError(null);
     setLoggedUser(demoSession.user);
-    navigate("/distribuidora");
+    navigate(getDefaultAuthenticatedRoute({ ...demoSession.user, tenantContext: demoSession.tenantContext }));
   };
 
   return (
@@ -124,10 +127,12 @@ export function LoginPage() {
             <span style={demoTextStyle}>juan@saaspro.com / 12345</span>
           </button>
 
-          <button type="button" onClick={handleDistribuidoraDemoAccess} style={distribuidoraDemoButtonStyle}>
-            <strong style={demoTitleStyle}>Distribuidora</strong>
-            <span style={demoTextStyle}>entra directo al flujo demo</span>
-          </button>
+          {DEMO_AUTH_ENABLED ? (
+            <button type="button" onClick={handleDistribuidoraDemoAccess} style={distribuidoraDemoButtonStyle}>
+              <strong style={demoTitleStyle}>Distribuidora</strong>
+              <span style={demoTextStyle}>entra directo al flujo demo</span>
+            </button>
+          ) : null}
 
           <button
             type="button"
@@ -179,6 +184,11 @@ export function LoginPage() {
             Crear cuenta
           </Link>
         </p>
+        {!DEMO_AUTH_ENABLED ? (
+          <p style={{ margin: 0, color: "#7a8793", fontSize: 13 }}>
+            El acceso demo directo de distribuidora esta desactivado en este entorno.
+          </p>
+        ) : null}
       </section>
     </main>
   );

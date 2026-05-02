@@ -1,11 +1,13 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { getStoredUser, logoutSession, refreshSession } from "./auth.client";
+import { getEnabledModules } from "./module-routing";
 
 export function DashboardPage() {
   const navigate = useNavigate();
   const [status, setStatus] = useState<string | null>(null);
   const user = useMemo(() => getStoredUser(), []);
+  const modules = getEnabledModules(user);
   const handleRefresh = async () => {
     setStatus("Renovando token...");
     const tokens = await refreshSession();
@@ -28,8 +30,14 @@ export function DashboardPage() {
         Tenant activo: <strong>{user?.tenantContext?.tenant.name || "Sin tenant cargado"}</strong>
       </p>
       <p>
-        Modulos activos: <strong>{user?.tenantContext?.modules.join(", ") || "Ninguno"}</strong>
+        Modulos activos: <strong>{modules.join(", ") || "Ninguno"}</strong>
       </p>
+
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+        {modules.includes("pos") ? <Link to="/pos">Abrir POS</Link> : null}
+        {modules.includes("camiones") ? <Link to="/camiones">Abrir Camiones</Link> : null}
+        {modules.includes("distribuidora") ? <Link to="/distribuidora">Abrir Distribuidora</Link> : null}
+      </div>
 
       <div style={{ display: "flex", gap: 8 }}>
         <button type="button" onClick={handleRefresh}>
