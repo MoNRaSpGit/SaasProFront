@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { BuildMetaCard } from "../../shared/components/BuildMetaCard";
 import { getStoredUser, logoutSession, refreshSession } from "./auth.client";
 import { getEnabledModules } from "./module-routing";
 
@@ -50,6 +51,10 @@ export function DashboardPage() {
       </div>
 
       {status ? <p style={{ marginTop: 12 }}>{status}</p> : null}
+
+      <div style={{ marginTop: 20 }}>
+        <BuildMetaCard />
+      </div>
     </main>
   );
 }

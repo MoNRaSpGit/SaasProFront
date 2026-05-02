@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
 import { API_BASE_URL } from "../../shared/config/api";
+import { BuildMetaCard } from "../../shared/components/BuildMetaCard";
 import { saveSession } from "./auth.client";
 import { getDefaultAuthenticatedRoute } from "./module-routing";
 import { AuthSession } from "./auth.types";
@@ -141,6 +142,8 @@ export function LoginPage() {
         <p style={{ margin: 0, color: "#7a8793", fontSize: 13 }}>
           `distribuidora` ya no entra por sesion fake: ahora forma parte oficial del SaaS y requiere modulo habilitado.
         </p>
+
+        <BuildMetaCard compact />
       </section>
     </main>
   );
