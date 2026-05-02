@@ -1,6 +1,6 @@
 import { API_BASE_URL } from "../../shared/config/api";
 import { fetchWithAuth } from "../auth/auth.client";
-import { SaasAdminTenantListResponse, UpdateTenantBillingPayload } from "./saas-admin.types";
+import { SaasAdminTenantListResponse, UpdateTenantModulesPayload, UpdateTenantBillingPayload } from "./saas-admin.types";
 
 async function readJson<T>(response: Response): Promise<T> {
   const payload = (await response.json()) as T & { message?: string | string[] };
@@ -37,5 +37,20 @@ export async function updateSaasAdminTenantBilling(tenantId: number, payload: Up
       graceUntil: string | null;
       blockedReason: string | null;
     };
+  }>(response);
+}
+
+export async function updateSaasAdminTenantModules(tenantId: number, payload: UpdateTenantModulesPayload) {
+  const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/saas-admin/tenants/${tenantId}/modules`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+
+  return readJson<{
+    tenant: { id: number; name: string; slug: string; status: string };
+    modules: string[];
   }>(response);
 }

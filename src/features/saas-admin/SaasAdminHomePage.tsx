@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { getStoredUser } from "../auth/auth.client";
 import { BuildMetaCard } from "../../shared/components/BuildMetaCard";
-import { getSaasAdminTenants, updateSaasAdminTenantBilling } from "./saas-admin.client";
-import { SaasAdminTenantBilling, SaasAdminTenantItem } from "./saas-admin.types";
+import { getSaasAdminTenants, updateSaasAdminTenantBilling, updateSaasAdminTenantModules } from "./saas-admin.client";
+import { SaasAdminModuleKey, SaasAdminTenantBilling, SaasAdminTenantItem } from "./saas-admin.types";
 
 type BillingDrafts = Record<
   number,
@@ -14,6 +14,8 @@ type BillingDrafts = Record<
     blockedReason: string;
   }
 >;
+
+type ModuleDrafts = Record<number, SaasAdminModuleKey[]>;
 
 const STATUS_OPTIONS: SaasAdminTenantBilling["status"][] = [
   "active",
@@ -26,9 +28,12 @@ export function SaasAdminHomePage() {
   const user = useMemo(() => getStoredUser(), []);
   const [tenants, setTenants] = useState<SaasAdminTenantItem[]>([]);
   const [drafts, setDrafts] = useState<BillingDrafts>({});
+  const [moduleDrafts, setModuleDrafts] = useState<ModuleDrafts>({});
+  const [availableModules, setAvailableModules] = useState<SaasAdminModuleKey[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [savingTenantId, setSavingTenantId] = useState<number | null>(null);
+  const [savingModulesTenantId, setSavingModulesTenantId] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState<"all" | SaasAdminTenantBilling["status"]>("all");
 
   useEffect(() => {
@@ -44,6 +49,7 @@ export function SaasAdminHomePage() {
 
     try {
       const payload = await getSaasAdminTenants();
+      setAvailableModules(payload.availableModules);
       setTenants(payload.items);
       setDrafts(
         Object.fromEntries(
@@ -58,6 +64,7 @@ export function SaasAdminHomePage() {
           ])
         )
       );
+      setModuleDrafts(Object.fromEntries(payload.items.map((tenant) => [tenant.id, tenant.modules])));
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "No se pudo cargar el panel interno");
     } finally {
@@ -104,6 +111,38 @@ export function SaasAdminHomePage() {
     }
   }
 
+  async function handleSaveModules(tenantId: number) {
+    const enabledModules = moduleDrafts[tenantId] || [];
+
+    setSavingModulesTenantId(tenantId);
+    setError(null);
+
+    try {
+      const updated = await updateSaasAdminTenantModules(tenantId, {
+        enabledModules
+      });
+
+      setTenants((current) =>
+        current.map((tenant) =>
+          tenant.id === tenantId
+            ? {
+                ...tenant,
+                modules: updated.modules as SaasAdminModuleKey[]
+              }
+            : tenant
+        )
+      );
+      setModuleDrafts((current) => ({
+        ...current,
+        [tenantId]: updated.modules as SaasAdminModuleKey[]
+      }));
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "No se pudieron guardar los modulos");
+    } finally {
+      setSavingModulesTenantId(null);
+    }
+  }
+
   function updateDraft(tenantId: number, patch: Partial<BillingDrafts[number]>) {
     setDrafts((current) => ({
       ...current,
@@ -112,6 +151,19 @@ export function SaasAdminHomePage() {
         ...patch
       }
     }));
+  }
+
+  function toggleDraftModule(tenantId: number, moduleKey: SaasAdminModuleKey) {
+    setModuleDrafts((current) => {
+      const currentModules = current[tenantId] || [];
+      const exists = currentModules.includes(moduleKey);
+      return {
+        ...current,
+        [tenantId]: exists
+          ? currentModules.filter((value) => value !== moduleKey)
+          : [...currentModules, moduleKey].sort()
+      };
+    });
   }
 
   return (
@@ -176,6 +228,34 @@ export function SaasAdminHomePage() {
                   <MetaLine label="Usuario base" value={tenant.primaryUser?.email || "Sin usuario"} />
                   <MetaLine label="Rol base" value={tenant.primaryUser?.membershipRole || "Sin membership"} />
                   <MetaLine label="Modulos" value={tenant.modules.join(", ") || "Ninguno"} />
+                </div>
+
+                <div style={moduleSectionStyle}>
+                  <span style={fieldLabelStyle}>Modulos habilitados</span>
+                  <div style={moduleGridStyle}>
+                    {availableModules.map((moduleKey) => {
+                      const enabled = (moduleDrafts[tenant.id] || []).includes(moduleKey);
+                      return (
+                        <label key={moduleKey} style={moduleChipStyle(enabled)}>
+                          <input
+                            type="checkbox"
+                            checked={enabled}
+                            onChange={() => toggleDraftModule(tenant.id, moduleKey)}
+                            style={{ margin: 0 }}
+                          />
+                          <span>{moduleKey}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <button
+                    type="button"
+                    disabled={savingModulesTenantId === tenant.id}
+                    onClick={() => void handleSaveModules(tenant.id)}
+                    style={secondaryButtonStyle}
+                  >
+                    {savingModulesTenantId === tenant.id ? "Guardando modulos..." : "Guardar modulos"}
+                  </button>
                 </div>
 
                 <div style={formGridStyle}>
@@ -464,6 +544,21 @@ const formGridStyle: React.CSSProperties = {
   gap: 10
 };
 
+const moduleSectionStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 10,
+  padding: "14px",
+  borderRadius: 16,
+  border: "1px solid #dbe4ec",
+  background: "#ffffff"
+};
+
+const moduleGridStyle: React.CSSProperties = {
+  display: "flex",
+  gap: 10,
+  flexWrap: "wrap"
+};
+
 const fieldWrapStyle: React.CSSProperties = {
   display: "grid",
   gap: 6
@@ -505,6 +600,19 @@ const secondaryButtonStyle: React.CSSProperties = {
   fontWeight: 700,
   cursor: "pointer"
 };
+
+const moduleChipStyle = (enabled: boolean): React.CSSProperties => ({
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 8,
+  padding: "10px 12px",
+  borderRadius: 999,
+  border: enabled ? "1px solid #3d6b95" : "1px solid #d5dde6",
+  background: enabled ? "#eaf3fb" : "#ffffff",
+  color: enabled ? "#16344d" : "#44515e",
+  fontWeight: 700,
+  cursor: "pointer"
+});
 
 const statusBadgeStyle = (status: SaasAdminTenantBilling["status"]): React.CSSProperties => ({
   borderRadius: 999,

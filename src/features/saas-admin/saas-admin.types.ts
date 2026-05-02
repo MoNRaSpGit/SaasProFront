@@ -5,6 +5,8 @@ export type SaasAdminTenantBilling = {
   blockedReason: string | null;
 };
 
+export type SaasAdminModuleKey = "camiones" | "distribuidora" | "pos";
+
 export type SaasAdminTenantItem = {
   id: number;
   name: string;
@@ -18,10 +20,11 @@ export type SaasAdminTenantItem = {
     fullName: string | null;
     membershipRole: string | null;
   } | null;
-  modules: string[];
+  modules: SaasAdminModuleKey[];
 };
 
 export type SaasAdminTenantListResponse = {
+  availableModules: SaasAdminModuleKey[];
   items: SaasAdminTenantItem[];
   total: number;
 };
@@ -31,4 +34,8 @@ export type UpdateTenantBillingPayload = {
   paidUntil?: string | null;
   graceUntil?: string | null;
   blockedReason?: string | null;
+};
+
+export type UpdateTenantModulesPayload = {
+  enabledModules: SaasAdminModuleKey[];
 };
