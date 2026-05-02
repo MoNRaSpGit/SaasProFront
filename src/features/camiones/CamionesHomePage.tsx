@@ -46,7 +46,11 @@ export function CamionesHomePage() {
   const [placeSearch, setPlaceSearch] = useState("");
   const [selectedPlace, setSelectedPlace] = useState<CamionesPlace | null>(null);
   const [kilometers, setKilometers] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [clientsLoading, setClientsLoading] = useState(true);
+  const [tripsLoading, setTripsLoading] = useState(false);
+  const [tripsLoaded, setTripsLoaded] = useState(false);
+  const [placesLoading, setPlacesLoading] = useState(false);
+  const [placesLoaded, setPlacesLoaded] = useState(false);
   const [savingTrip, setSavingTrip] = useState(false);
   const [savingClient, setSavingClient] = useState(false);
   const [markingPaidId, setMarkingPaidId] = useState<number | null>(null);
@@ -55,7 +59,7 @@ export function CamionesHomePage() {
   const [clientDraftPhone, setClientDraftPhone] = useState("");
 
   useEffect(() => {
-    void loadInitialData();
+    void loadInitialClients();
   }, []);
 
   useEffect(() => {
@@ -64,27 +68,26 @@ export function CamionesHomePage() {
     }
 
     if (tab === "viaje") {
+      void ensurePlacesLoaded();
       placeInputRef.current?.focus();
+    }
+
+    if (tab === "registro") {
+      void ensureTripsLoaded();
     }
   }, [tab]);
 
-  async function loadInitialData() {
-    setLoading(true);
+  async function loadInitialClients() {
+    setClientsLoading(true);
 
     try {
-      const [clientsPayload, placesPayload, tripsPayload] = await Promise.all([
-        listCamionesClients({ limit: 100 }),
-        listCamionesPlaces({ limit: 100 }),
-        listCamionesTrips({ limit: 100 })
-      ]);
-
+      const clientsPayload = await listCamionesClients({ limit: 100 });
       setClients(clientsPayload.items);
-      setPlaces(placesPayload.items);
-      setTrips(tripsPayload.items);
+      void ensureTripsLoaded();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo cargar camiones");
     } finally {
-      setLoading(false);
+      setClientsLoading(false);
     }
   }
 
@@ -94,13 +97,49 @@ export function CamionesHomePage() {
   }
 
   async function refreshTrips() {
-    const payload = await listCamionesTrips({ limit: 100 });
-    setTrips(payload.items);
+    setTripsLoading(true);
+    try {
+      const payload = await listCamionesTrips({ limit: 100 });
+      setTrips(payload.items);
+      setTripsLoaded(true);
+    } finally {
+      setTripsLoading(false);
+    }
   }
 
   async function refreshPlaces() {
-    const payload = await listCamionesPlaces({ limit: 100 });
-    setPlaces(payload.items);
+    setPlacesLoading(true);
+    try {
+      const payload = await listCamionesPlaces({ limit: 100 });
+      setPlaces(payload.items);
+      setPlacesLoaded(true);
+    } finally {
+      setPlacesLoading(false);
+    }
+  }
+
+  async function ensurePlacesLoaded() {
+    if (placesLoaded || placesLoading) {
+      return;
+    }
+
+    try {
+      await refreshPlaces();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudieron cargar los lugares");
+    }
+  }
+
+  async function ensureTripsLoaded() {
+    if (tripsLoaded || tripsLoading) {
+      return;
+    }
+
+    try {
+      await refreshTrips();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo cargar el registro");
+    }
   }
 
   const clientPendingTripMap = useMemo(() => {
@@ -328,13 +367,7 @@ export function CamionesHomePage() {
           </button>
         </section>
 
-        {loading ? (
-          <section style={panelStyle}>
-            <div style={emptyBoxStyle}>Cargando datos de camiones...</div>
-          </section>
-        ) : null}
-
-        {!loading && tab === "cliente" ? (
+        {tab === "cliente" ? (
           <section style={panelStyle}>
             <div style={{ display: "grid", gap: 8 }}>
               <h2 style={{ margin: 0, fontSize: 24, color: "#2f241e" }}>Buscar cliente</h2>
@@ -371,6 +404,7 @@ export function CamionesHomePage() {
               </label>
 
               <div style={{ display: "grid", gap: 8 }}>
+                {clientsLoading ? <div style={emptyBoxStyle}>Cargando clientes...</div> : null}
                 {filteredClients.map((client) => (
                   <button
                     key={client.id}
@@ -396,7 +430,9 @@ export function CamionesHomePage() {
                     </span>
                   </button>
                 ))}
-                {filteredClients.length === 0 ? <div style={emptyBoxStyle}>No hay clientes para esa busqueda.</div> : null}
+                {!clientsLoading && filteredClients.length === 0 ? (
+                  <div style={emptyBoxStyle}>No hay clientes para esa busqueda.</div>
+                ) : null}
               </div>
 
               <button type="button" onClick={() => void goToTripStep()} style={saveButtonStyle} disabled={savingClient}>
@@ -406,7 +442,7 @@ export function CamionesHomePage() {
           </section>
         ) : null}
 
-        {!loading && tab === "viaje" ? (
+        {tab === "viaje" ? (
           <section style={panelStyle}>
             <div style={{ display: "grid", gap: 8 }}>
               <h2 style={{ margin: 0, fontSize: 24, color: "#2f241e" }}>Cargar viaje</h2>
@@ -446,6 +482,7 @@ export function CamionesHomePage() {
               </label>
 
               <div style={{ display: "grid", gap: 8 }}>
+                {placesLoading ? <div style={emptyBoxStyle}>Cargando lugares...</div> : null}
                 {filteredPlaces.map((place) => (
                   <button
                     key={place.id}
@@ -460,7 +497,9 @@ export function CamionesHomePage() {
                     {place.name}
                   </button>
                 ))}
-                {filteredPlaces.length === 0 ? <div style={emptyBoxStyle}>No hay lugares para esa busqueda.</div> : null}
+                {!placesLoading && filteredPlaces.length === 0 ? (
+                  <div style={emptyBoxStyle}>No hay lugares para esa busqueda.</div>
+                ) : null}
               </div>
 
               <label style={fieldWrapStyle}>
@@ -485,7 +524,7 @@ export function CamionesHomePage() {
           </section>
         ) : null}
 
-        {!loading && tab === "registro" ? (
+        {tab === "registro" ? (
           <section style={panelStyle}>
             <div style={{ display: "grid", gap: 8 }}>
               <h2 style={{ margin: 0, fontSize: 24, color: "#2f241e" }}>Registro</h2>
@@ -495,7 +534,8 @@ export function CamionesHomePage() {
             </div>
 
             <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
-              {trips.length === 0 ? <div style={emptyBoxStyle}>Todavia no hay viajes registrados.</div> : null}
+              {tripsLoading ? <div style={emptyBoxStyle}>Cargando registro...</div> : null}
+              {!tripsLoading && trips.length === 0 ? <div style={emptyBoxStyle}>Todavia no hay viajes registrados.</div> : null}
               {trips.map((trip) => (
                 <article key={trip.id} style={trip.status === "paid" ? historyCardStyle : tripCardStyle}>
                   <div style={{ display: "grid", gap: 4 }}>
