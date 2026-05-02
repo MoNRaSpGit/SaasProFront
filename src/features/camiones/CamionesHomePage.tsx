@@ -312,7 +312,7 @@ export function CamionesHomePage() {
         <header style={heroStyle}>
           <div style={heroTopRowStyle}>
             <p style={heroEyebrowStyle}>Modelo Camiones</p>
-            <ModelUserMenu />
+            <ModelUserMenu variant="dark" />
           </div>
         </header>
 
