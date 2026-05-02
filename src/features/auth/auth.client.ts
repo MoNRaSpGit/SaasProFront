@@ -1,4 +1,4 @@
-import { AuthSession, AuthTokens, AuthUser } from "./auth.types";
+import { AuthSession, AuthTokens, StoredAuthUser } from "./auth.types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://saasproback.onrender.com";
 const ACCESS_TOKEN_KEY = "saaspro_access_token";
@@ -8,14 +8,20 @@ const USER_KEY = "saaspro_user";
 export function saveSession(session: AuthSession) {
   localStorage.setItem(ACCESS_TOKEN_KEY, session.tokens.accessToken);
   localStorage.setItem(REFRESH_TOKEN_KEY, session.tokens.refreshToken);
-  localStorage.setItem(USER_KEY, JSON.stringify(session.user));
+  localStorage.setItem(
+    USER_KEY,
+    JSON.stringify({
+      ...session.user,
+      tenantContext: session.tenantContext
+    } satisfies StoredAuthUser)
+  );
 }
 
-export function getStoredUser(): AuthUser | null {
+export function getStoredUser(): StoredAuthUser | null {
   const raw = localStorage.getItem(USER_KEY);
   if (!raw) return null;
   try {
-    return JSON.parse(raw) as AuthUser;
+    return JSON.parse(raw) as StoredAuthUser;
   } catch {
     return null;
   }

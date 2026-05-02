@@ -6,6 +6,7 @@ import { AuthSession } from "./auth.types";
 
 type RegisterFormValues = {
   fullName: string;
+  tenantName: string;
   email: string;
   password: string;
 };
@@ -30,6 +31,7 @@ export function RegisterPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           fullName: values.fullName,
+          tenantName: values.tenantName,
           email: values.email,
           password: values.password
         })
@@ -68,6 +70,17 @@ export function RegisterPage() {
           />
         </label>
         {errors.fullName ? <small style={{ color: "crimson" }}>{errors.fullName.message}</small> : null}
+
+        <label>
+          Nombre del negocio
+          <input
+            type="text"
+            placeholder="La Claudia"
+            style={{ width: "100%", padding: 10, marginTop: 4 }}
+            {...register("tenantName", { required: "Nombre del negocio requerido" })}
+          />
+        </label>
+        {errors.tenantName ? <small style={{ color: "crimson" }}>{errors.tenantName.message}</small> : null}
 
         <label>
           Email

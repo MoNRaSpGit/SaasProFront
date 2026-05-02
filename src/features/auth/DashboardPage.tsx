@@ -6,7 +6,6 @@ export function DashboardPage() {
   const navigate = useNavigate();
   const [status, setStatus] = useState<string | null>(null);
   const user = useMemo(() => getStoredUser(), []);
-
   const handleRefresh = async () => {
     setStatus("Renovando token...");
     const tokens = await refreshSession();
@@ -24,6 +23,12 @@ export function DashboardPage() {
       <p>Ruta protegida activa.</p>
       <p>
         Usuario: <strong>{user?.email || "N/A"}</strong>
+      </p>
+      <p>
+        Tenant activo: <strong>{user?.tenantContext?.tenant.name || "Sin tenant cargado"}</strong>
+      </p>
+      <p>
+        Modulos activos: <strong>{user?.tenantContext?.modules.join(", ") || "Ninguno"}</strong>
       </p>
 
       <div style={{ display: "flex", gap: 8 }}>
