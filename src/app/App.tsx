@@ -1,4 +1,4 @@
-import { Link, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import { DashboardPage } from "../features/auth/DashboardPage";
 import { CamionesHomePage } from "../features/camiones/CamionesHomePage";
 import { DistribuidoraAdminPage } from "../features/distribuidora/DistribuidoraAdminPage";
@@ -8,110 +8,6 @@ import { ProtectedRoute } from "../features/auth/ProtectedRoute";
 import { RegisterPage } from "../features/auth/RegisterPage";
 import { PosHomePage } from "../features/pos/PosHomePage";
 import { SaasAdminHomePage } from "../features/saas-admin/SaasAdminHomePage";
-
-function HomePage() {
-  return (
-    <main
-      style={{
-        minHeight: "100vh",
-        padding: "32px 16px 56px",
-        fontFamily: "system-ui, sans-serif",
-        background:
-          "radial-gradient(circle at top left, rgba(222, 234, 247, 0.95), transparent 28%), linear-gradient(180deg, #f5f8fb 0%, #eef3f8 100%)"
-      }}
-    >
-      <div style={{ maxWidth: 1080, margin: "0 auto" }}>
-        <section
-          style={{
-            padding: "28px 28px 30px",
-            borderRadius: 28,
-            background: "#172433",
-            color: "#f7fafc",
-            boxShadow: "0 24px 60px rgba(23, 36, 51, 0.22)"
-          }}
-        >
-          <p style={{ margin: 0, letterSpacing: "0.16em", textTransform: "uppercase", fontSize: 12, opacity: 0.74 }}>
-            SaaS Multi-Modelo
-          </p>
-          <h1 style={{ margin: "12px 0 10px", fontSize: 42, lineHeight: 1.05 }}>SaaSPro</h1>
-          <p style={{ margin: 0, maxWidth: 720, fontSize: 18, lineHeight: 1.6, opacity: 0.86 }}>
-            Entrada principal del SaaS para autenticacion, registro y acceso al espacio de trabajo de cada cliente.
-          </p>
-
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 22 }}>
-            <Link to="/login" style={heroLinkStyle(true)}>
-              Ir a login
-            </Link>
-            <Link to="/register" style={heroLinkStyle(false)}>
-              Crear cuenta
-            </Link>
-            <Link to="/dashboard" style={heroLinkStyle(false)}>
-              Ir al dashboard
-            </Link>
-          </div>
-        </section>
-
-        <section
-          style={{
-            marginTop: 22,
-            display: "grid",
-            gap: 18,
-            gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))"
-          }}
-        >
-          <article style={homeCardStyle}>
-            <p style={eyebrowStyle}>Acceso</p>
-            <h2 style={cardTitleStyle}>Auth</h2>
-            <p style={cardBodyStyle}>Entra con tu usuario del SaaS o registra un tenant nuevo con su contexto inicial.</p>
-            <Link to="/login" style={cardLinkStyle}>
-              Abrir login
-            </Link>
-          </article>
-
-          <article style={homeCardStyle}>
-            <p style={eyebrowStyle}>Cliente</p>
-            <h2 style={cardTitleStyle}>Dashboard</h2>
-            <p style={cardBodyStyle}>
-              Punto de entrada de cada tenant para ver sus modulos habilitados y entrar al flujo correcto.
-            </p>
-            <Link to="/dashboard" style={cardLinkStyle}>
-              Ir al dashboard
-            </Link>
-          </article>
-
-          <article style={homeCardStyle}>
-            <p style={eyebrowStyle}>Cuenta</p>
-            <h2 style={cardTitleStyle}>Registro</h2>
-            <p style={cardBodyStyle}>
-              Alta de un tenant nuevo con su usuario principal y contexto base listo para empezar.
-            </p>
-            <Link to="/register" style={cardLinkStyle}>
-              Crear cuenta
-            </Link>
-          </article>
-
-          <article style={homeCardStyle}>
-            <p style={eyebrowStyle}>Estado</p>
-            <h2 style={cardTitleStyle}>Health</h2>
-            <p style={cardBodyStyle}>Chequeo simple del frontend para validar que la app esta levantando bien.</p>
-            <Link to="/health" style={cardLinkStyle}>
-              Ver health
-            </Link>
-          </article>
-
-          <article style={homeCardStyle}>
-            <p style={eyebrowStyle}>Interno</p>
-            <h2 style={cardTitleStyle}>SaaS Admin</h2>
-            <p style={cardBodyStyle}>Panel interno lite para revisar tenants, modulos y estado de cobro.</p>
-            <Link to="/saas-admin" style={cardLinkStyle}>
-              Abrir panel
-            </Link>
-          </article>
-        </section>
-      </div>
-    </main>
-  );
-}
 
 function HealthPage() {
   return (
@@ -124,7 +20,7 @@ function HealthPage() {
 export function App() {
   return (
     <Routes>
-      <Route path="/" element={<HomePage />} />
+      <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route
@@ -179,52 +75,3 @@ export function App() {
     </Routes>
   );
 }
-
-const heroLinkStyle = (primary: boolean): React.CSSProperties => ({
-  padding: "12px 16px",
-  borderRadius: 999,
-  textDecoration: "none",
-  fontWeight: 700,
-  border: primary ? "1px solid #f4d7a2" : "1px solid rgba(255,255,255,0.18)",
-  background: primary ? "#f1d8a8" : "transparent",
-  color: primary ? "#2d2110" : "#f7fafc"
-});
-
-const homeCardStyle: React.CSSProperties = {
-  padding: 22,
-  borderRadius: 24,
-  background: "#ffffff",
-  border: "1px solid #dce4ec",
-  boxShadow: "0 16px 38px rgba(27, 54, 85, 0.07)"
-};
-
-const eyebrowStyle: React.CSSProperties = {
-  margin: 0,
-  fontSize: 12,
-  letterSpacing: "0.12em",
-  textTransform: "uppercase",
-  color: "#66717c"
-};
-
-const cardTitleStyle: React.CSSProperties = {
-  margin: "10px 0 8px",
-  fontSize: 26,
-  color: "#182433"
-};
-
-const cardBodyStyle: React.CSSProperties = {
-  margin: 0,
-  color: "#5e6a76",
-  lineHeight: 1.6
-};
-
-const cardLinkStyle: React.CSSProperties = {
-  display: "inline-flex",
-  marginTop: 14,
-  padding: "10px 14px",
-  borderRadius: 14,
-  textDecoration: "none",
-  background: "#172433",
-  color: "#f7fafc",
-  fontWeight: 700
-};
