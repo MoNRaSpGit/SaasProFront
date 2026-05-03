@@ -46,6 +46,7 @@ function normalizeText(value: string) {
 }
 
 export function CamionesHomePage() {
+  const CLIENTS_PAGE_SIZE = 3;
   const clientInputRef = useRef<HTMLInputElement | null>(null);
   const placeInputRef = useRef<HTMLInputElement | null>(null);
   const kilometersInputRef = useRef<HTMLInputElement | null>(null);
@@ -54,6 +55,7 @@ export function CamionesHomePage() {
   const [places, setPlaces] = useState<CamionesPlace[]>([]);
   const [trips, setTrips] = useState<CamionesTrip[]>([]);
   const [clientSearch, setClientSearch] = useState("");
+  const [visibleClientCount, setVisibleClientCount] = useState(CLIENTS_PAGE_SIZE);
   const [selectedClient, setSelectedClient] = useState<CamionesClient | null>(null);
   const [tripDate, setTripDate] = useState(getTodayDate());
   const [placeSearch, setPlaceSearch] = useState("");
@@ -183,13 +185,22 @@ export function CamionesHomePage() {
   const filteredClients = useMemo(() => {
     const query = normalizeText(clientSearch);
     if (!query) {
-      return clients.slice(0, 6);
+      return clients;
     }
 
     return clients.filter((client) => {
       const phone = client.phone?.toLowerCase() || "";
       return client.name.toLowerCase().includes(query) || phone.includes(query);
     });
+  }, [clientSearch, clients]);
+
+  const visibleClients = useMemo(
+    () => filteredClients.slice(0, visibleClientCount),
+    [filteredClients, visibleClientCount]
+  );
+
+  useEffect(() => {
+    setVisibleClientCount(CLIENTS_PAGE_SIZE);
   }, [clientSearch, clients]);
 
   const filteredPlaces = useMemo(() => {
@@ -494,7 +505,6 @@ export function CamionesHomePage() {
         tripDate,
         kilometers: Number(kmValue.toFixed(2))
       });
-
       await refreshTrips();
       toast.success(`Viaje guardado para ${selectedClient.name}`);
       setClientSearch("");
@@ -563,7 +573,6 @@ export function CamionesHomePage() {
         tripDate: tripDateValue,
         kilometers: Number(kilometersValue.toFixed(2))
       });
-
       await refreshTrips();
       closeTripModal();
       toast.success("Registro actualizado");
@@ -623,6 +632,7 @@ export function CamionesHomePage() {
                     value={clientSearch}
                     onChange={(event) => {
                       setClientSearch(event.target.value);
+                      setVisibleClientCount(CLIENTS_PAGE_SIZE);
                       setSelectedClient(null);
                     }}
                     placeholder="Escribe el cliente"
@@ -634,9 +644,9 @@ export function CamionesHomePage() {
                 </div>
               </label>
 
-              <div style={{ display: "grid", gap: 8 }}>
+              <div style={clientListWrapStyle}>
                 {clientsLoading ? <div style={emptyBoxStyle}>Cargando clientes...</div> : null}
-                {filteredClients.map((client) => (
+                {visibleClients.map((client) => (
                   <div key={client.id} style={entityWrapStyle}>
                     <button
                       type="button"
@@ -689,6 +699,15 @@ export function CamionesHomePage() {
                 ))}
                 {!clientsLoading && filteredClients.length === 0 ? (
                   <div style={emptyBoxStyle}>No hay clientes para esa busqueda.</div>
+                ) : null}
+                {!clientsLoading && filteredClients.length > visibleClients.length ? (
+                  <button
+                    type="button"
+                    onClick={() => setVisibleClientCount((current) => current + CLIENTS_PAGE_SIZE)}
+                    style={secondaryActionButtonStyle}
+                  >
+                    Ver mas
+                  </button>
                 ) : null}
               </div>
 
@@ -1206,6 +1225,13 @@ const entityWrapStyle: React.CSSProperties = {
   gap: 6
 };
 
+const clientListWrapStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 8,
+  minHeight: 320,
+  alignContent: "start"
+};
+
 const clientCellContentStyle: React.CSSProperties = {
   position: "relative",
   display: "block",
@@ -1440,10 +1466,12 @@ const pendingPillButtonStyle: React.CSSProperties = {
 
 const emptyBoxStyle: React.CSSProperties = {
   padding: 16,
+  minHeight: 72,
   borderRadius: 18,
   border: "1px dashed #d8ccbf",
   background: "#fffaf4",
-  color: "#726255"
+  color: "#726255",
+  boxSizing: "border-box"
 };
 
 const modalOverlayStyle: React.CSSProperties = {
