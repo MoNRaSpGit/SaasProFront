@@ -1,55 +1,31 @@
 import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { API_BASE_URL } from "../../shared/config/api";
 import { BuildMetaCard } from "../../shared/components/BuildMetaCard";
 import { saveSession } from "./auth.client";
-import { getDefaultAuthenticatedRoute } from "./module-routing";
 import { AuthSession } from "./auth.types";
-
-type LoginFormValues = {
-  email: string;
-  password: string;
-};
 
 type LoginResponse = AuthSession;
 
-const SINGLE_MODULE_DEMO = {
-  label: "1 modulo",
-  title: "POS directo",
-  email: "pos.demo@saaspro.com",
-  password: "posdemo123",
-  description: "Entra directo a POS porque el tenant tiene un solo modulo."
-};
-
-const MULTI_MODULE_DEMO = {
-  label: "2 modulos",
-  title: "POS + Camiones",
+const CAMIONES_DEMO_ACCESS = {
   email: "operaciones.demo@saaspro.com",
-  password: "opsdemo123",
-  description: "Entra al dashboard porque el tenant tiene mas de un modulo."
+  password: "opsdemo123"
 };
 
 export function LoginPage() {
   const navigate = useNavigate();
   const [apiError, setApiError] = useState<string | null>(null);
-  const [loggedUser, setLoggedUser] = useState<LoginResponse["user"] | null>(null);
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    formState: { errors, isSubmitting }
-  } = useForm<LoginFormValues>();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const onSubmit = async (values: LoginFormValues) => {
+  const handleLogin = async () => {
     setApiError(null);
-    setLoggedUser(null);
+    setIsSubmitting(true);
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values)
+        body: JSON.stringify(CAMIONES_DEMO_ACCESS)
       });
 
       const payload = (await response.json()) as LoginResponse | { message?: string | string[] };
@@ -63,106 +39,38 @@ export function LoginPage() {
       }
 
       const data = payload as LoginResponse;
-      saveSession(data);
-      setLoggedUser(data.user);
-      navigate(getDefaultAuthenticatedRoute({ ...data.user, tenantContext: data.tenantContext }));
+      const camionesOnlySession: LoginResponse = {
+        ...data,
+        tenantContext: data.tenantContext
+          ? {
+              ...data.tenantContext,
+              modules: ["camiones"]
+            }
+          : data.tenantContext
+      };
+
+      saveSession(camionesOnlySession);
+      navigate("/camiones");
     } catch {
-      setApiError("No se pudo conectar al backend. Revisar CORS/URL/API.");
+      setApiError("No se pudo conectar al backend.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
     <main style={pageStyle}>
-      <section style={heroPanelStyle}>
-        <p style={eyebrowStyle}>SaaS Multi-Modelo</p>
-        <h1 style={heroTitleStyle}>Entrar a SaasPro</h1>
-        <p style={heroBodyStyle}>
-          Ingresa con tu usuario real o usa uno de los accesos rapidos para probar los modelos que ya tenemos listos.
-        </p>
-      </section>
-
       <section style={cardStyle}>
-        <div style={{ display: "grid", gap: 8 }}>
-          <h2 style={{ margin: 0, fontSize: 24, color: "#182433" }}>Login</h2>
-          <p style={{ margin: 0, color: "#5f6a75", lineHeight: 1.5 }}>
-            Usa tu email y password del backend. Los accesos demo son solo temporales para probar.
-          </p>
+        <div style={{ display: "grid", gap: 6 }}>
+          <p style={eyebrowStyle}>Camiones</p>
+          <h1 style={titleStyle}>Login</h1>
         </div>
 
-        <div style={demoGridStyle}>
-          <button
-            type="button"
-            onClick={() => {
-              setValue("email", SINGLE_MODULE_DEMO.email);
-              setValue("password", SINGLE_MODULE_DEMO.password);
-            }}
-            style={demoButtonStyle}
-          >
-            <span style={demoBadgeStyle}>{SINGLE_MODULE_DEMO.label}</span>
-            <strong style={demoTitleStyle}>{SINGLE_MODULE_DEMO.title}</strong>
-            <span style={demoTextStyle}>
-              {SINGLE_MODULE_DEMO.email} / {SINGLE_MODULE_DEMO.password}
-            </span>
-            <span style={demoHintStyle}>{SINGLE_MODULE_DEMO.description}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setValue("email", MULTI_MODULE_DEMO.email);
-              setValue("password", MULTI_MODULE_DEMO.password);
-            }}
-            style={camionesDemoButtonStyle}
-          >
-            <span style={demoBadgeStyle}>{MULTI_MODULE_DEMO.label}</span>
-            <strong style={demoTitleStyle}>{MULTI_MODULE_DEMO.title}</strong>
-            <span style={demoTextStyle}>
-              {MULTI_MODULE_DEMO.email} / {MULTI_MODULE_DEMO.password}
-            </span>
-            <span style={demoHintStyle}>{MULTI_MODULE_DEMO.description}</span>
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit(onSubmit)} style={formStyle}>
-          <label style={fieldWrapStyle}>
-            <span style={fieldLabelStyle}>Email</span>
-            <input
-              type="email"
-              placeholder="tu@email.com"
-              style={inputStyle}
-              {...register("email", { required: "Email requerido" })}
-            />
-          </label>
-          {errors.email ? <small style={errorTextStyle}>{errors.email.message}</small> : null}
-
-          <label style={fieldWrapStyle}>
-            <span style={fieldLabelStyle}>Password</span>
-            <input
-              type="password"
-              placeholder="********"
-              style={inputStyle}
-              {...register("password", { required: "Password requerido" })}
-            />
-          </label>
-          {errors.password ? <small style={errorTextStyle}>{errors.password.message}</small> : null}
-
-          <button type="submit" disabled={isSubmitting} style={submitButtonStyle}>
-            {isSubmitting ? "Entrando..." : "Iniciar sesion"}
-          </button>
-        </form>
+        <button type="button" onClick={() => void handleLogin()} disabled={isSubmitting} style={submitButtonStyle}>
+          {isSubmitting ? "Entrando..." : "Login"}
+        </button>
 
         {apiError ? <div style={errorBoxStyle}>{apiError}</div> : null}
-        {loggedUser ? <div style={successBoxStyle}>Login OK: {loggedUser.email}</div> : null}
-
-        <p style={{ margin: 0, color: "#5f6a75" }}>
-          No tenes cuenta?{" "}
-          <Link to="/register" style={inlineLinkStyle}>
-            Crear cuenta
-          </Link>
-        </p>
-        <p style={{ margin: 0, color: "#7a8793", fontSize: 13 }}>
-          `distribuidora` ya no entra por sesion fake: ahora forma parte oficial del SaaS y requiere modulo habilitado.
-        </p>
 
         <BuildMetaCard compact />
       </section>
@@ -172,24 +80,24 @@ export function LoginPage() {
 
 const pageStyle: React.CSSProperties = {
   minHeight: "100vh",
-  padding: "32px 16px 48px",
+  padding: "24px 16px",
   fontFamily: "system-ui, sans-serif",
   background:
-    "radial-gradient(circle at top left, rgba(223, 232, 244, 0.95), transparent 28%), linear-gradient(180deg, #f5f8fb 0%, #ecf2f8 100%)",
+    "radial-gradient(circle at top left, rgba(254, 207, 121, 0.22), transparent 28%), linear-gradient(180deg, #f8f4ec 0%, #eee5d9 100%)",
   display: "grid",
-  gap: 18,
-  alignContent: "center",
-  justifyItems: "center"
+  placeItems: "center"
 };
 
-const heroPanelStyle: React.CSSProperties = {
+const cardStyle: React.CSSProperties = {
   width: "100%",
-  maxWidth: 520,
-  padding: "24px 24px 26px",
+  maxWidth: 420,
+  padding: 24,
   borderRadius: 28,
-  background: "#172433",
-  color: "#f7fafc",
-  boxShadow: "0 24px 60px rgba(23, 36, 51, 0.22)"
+  background: "#fffdf9",
+  border: "1px solid #ded3c6",
+  boxShadow: "0 20px 44px rgba(27, 54, 85, 0.08)",
+  display: "grid",
+  gap: 18
 };
 
 const eyebrowStyle: React.CSSProperties = {
@@ -197,127 +105,28 @@ const eyebrowStyle: React.CSSProperties = {
   fontSize: 12,
   textTransform: "uppercase",
   letterSpacing: "0.16em",
-  color: "rgba(247, 250, 252, 0.72)"
+  color: "#8b755d",
+  fontWeight: 800
 };
 
-const heroTitleStyle: React.CSSProperties = {
-  margin: "10px 0 8px",
-  fontSize: 36,
-  lineHeight: 1.05
-};
-
-const heroBodyStyle: React.CSSProperties = {
+const titleStyle: React.CSSProperties = {
   margin: 0,
-  color: "rgba(247, 250, 252, 0.82)",
-  lineHeight: 1.6
-};
-
-const cardStyle: React.CSSProperties = {
-  width: "100%",
-  maxWidth: 520,
-  padding: 24,
-  borderRadius: 28,
-  background: "#ffffff",
-  border: "1px solid #dbe4ec",
-  boxShadow: "0 20px 44px rgba(27, 54, 85, 0.08)",
-  display: "grid",
-  gap: 18
-};
-
-const demoGridStyle: React.CSSProperties = {
-  display: "grid",
-  gap: 10
-};
-
-const demoButtonStyle: React.CSSProperties = {
-  display: "grid",
-  gap: 6,
-  width: "100%",
-  textAlign: "left",
-  padding: "14px 16px",
-  borderRadius: 18,
-  border: "1px solid #d6dde6",
-  background: "#f7fafc",
-  cursor: "pointer"
-};
-
-const camionesDemoButtonStyle: React.CSSProperties = {
-  ...demoButtonStyle,
-  border: "1px solid #e5d3a9",
-  background: "#fff4df"
-};
-
-const demoTitleStyle: React.CSSProperties = {
-  fontSize: 15,
-  color: "#182433"
-};
-
-const demoBadgeStyle: React.CSSProperties = {
-  width: "fit-content",
-  padding: "4px 9px",
-  borderRadius: 999,
-  background: "rgba(23, 36, 51, 0.08)",
-  color: "#314253",
-  fontSize: 11,
-  fontWeight: 800,
-  textTransform: "uppercase",
-  letterSpacing: "0.08em"
-};
-
-const demoTextStyle: React.CSSProperties = {
-  fontSize: 13,
-  color: "#60707d"
-};
-
-const demoHintStyle: React.CSSProperties = {
-  fontSize: 12,
-  color: "#4c5d6b",
-  lineHeight: 1.45
-};
-
-const formStyle: React.CSSProperties = {
-  display: "grid",
-  gap: 12
-};
-
-const fieldWrapStyle: React.CSSProperties = {
-  display: "grid",
-  gap: 8
-};
-
-const fieldLabelStyle: React.CSSProperties = {
-  fontSize: 14,
-  fontWeight: 700,
-  color: "#3d4a57"
-};
-
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  minHeight: 52,
-  padding: "14px 16px",
-  borderRadius: 16,
-  border: "1px solid #d5dde6",
-  background: "#fbfdff",
-  fontSize: 16,
-  boxSizing: "border-box"
+  fontSize: 34,
+  lineHeight: 1.05,
+  color: "#2f241e"
 };
 
 const submitButtonStyle: React.CSSProperties = {
-  minHeight: 54,
+  minHeight: 56,
   padding: "14px 16px",
-  borderRadius: 16,
-  border: "1px solid rgba(20, 47, 71, 0.2)",
-  background: "#172433",
-  color: "#f7fafc",
+  borderRadius: 18,
+  border: "1px solid rgba(16, 74, 53, 0.2)",
+  background: "#2b7a57",
+  color: "#f7fffb",
   fontWeight: 800,
-  fontSize: 16,
+  fontSize: 18,
   cursor: "pointer",
-  boxShadow: "0 16px 28px rgba(23, 36, 51, 0.18)"
-};
-
-const errorTextStyle: React.CSSProperties = {
-  color: "#b42318",
-  marginTop: -4
+  boxShadow: "0 16px 28px rgba(43, 122, 87, 0.22)"
 };
 
 const errorBoxStyle: React.CSSProperties = {
@@ -326,18 +135,4 @@ const errorBoxStyle: React.CSSProperties = {
   background: "#fff1f1",
   border: "1px solid #f0c8c8",
   color: "#a12626"
-};
-
-const successBoxStyle: React.CSSProperties = {
-  padding: "12px 14px",
-  borderRadius: 16,
-  background: "#eef8f1",
-  border: "1px solid #cde7d4",
-  color: "#21613d"
-};
-
-const inlineLinkStyle: React.CSSProperties = {
-  color: "#1f4f7b",
-  fontWeight: 700,
-  textDecoration: "none"
 };
