@@ -253,12 +253,6 @@ export function CamionesHomePage() {
     setClientModalState({ mode: "create", clientId: null });
   }
 
-  function openClientEditModal(client: CamionesClient) {
-    setClientDraftName(client.name);
-    setClientDraftPhone(client.phone || "");
-    setClientModalState({ mode: "edit", clientId: client.id });
-  }
-
   function closeClientModal() {
     if (savingClient || deletingClient) {
       return;
@@ -273,11 +267,6 @@ export function CamionesHomePage() {
   function openPlaceCreateModal() {
     setPlaceDraftName(placeSearch.trim());
     setPlaceModalState({ mode: "create", placeId: null });
-  }
-
-  function openPlaceEditModal(place: CamionesPlace) {
-    setPlaceDraftName(place.name);
-    setPlaceModalState({ mode: "edit", placeId: place.id });
   }
 
   function closePlaceModal() {
@@ -662,26 +651,6 @@ export function CamionesHomePage() {
                           <span>{client.name}</span>
                           <span style={clientPhoneStyle}>{client.phone || "Sin telefono"}</span>
                         </span>
-                        <span style={clientCellMiddleStyle}>
-                          <span
-                            role="button"
-                            tabIndex={0}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              openClientEditModal(client);
-                            }}
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter" || event.key === " ") {
-                                event.preventDefault();
-                                event.stopPropagation();
-                                openClientEditModal(client);
-                              }
-                            }}
-                            style={centerActionButtonStyle}
-                          >
-                            Editar
-                          </span>
-                        </span>
                         <span style={clientCellStatusWrapStyle}>
                           {clientPendingTripMap.get(client.id) ? (
                             <span style={clientPendingStatusStyle} aria-label="Cliente con pendiente">
@@ -772,26 +741,6 @@ export function CamionesHomePage() {
                     >
                       <span style={placeCellContentStyle}>
                         <span style={placeCellTextStyle}>{place.name}</span>
-                        <span style={placeCellMiddleStyle}>
-                          <span
-                            role="button"
-                            tabIndex={0}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              openPlaceEditModal(place);
-                            }}
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter" || event.key === " ") {
-                                event.preventDefault();
-                                event.stopPropagation();
-                                openPlaceEditModal(place);
-                              }
-                            }}
-                            style={centerActionButtonStyle}
-                          >
-                            Editar
-                          </span>
-                        </span>
                       </span>
                     </button>
                   </div>
@@ -1238,22 +1187,11 @@ const clientCellContentStyle: React.CSSProperties = {
   width: "100%"
 };
 
-const clientCellMiddleStyle: React.CSSProperties = {
-  position: "absolute",
-  left: "50%",
-  top: "50%",
-  transform: "translate(-50%, -50%)",
-  display: "flex",
-  justifyContent: "center",
-  alignItems: "center",
-  zIndex: 1
-};
-
 const clientCellTextStyle: React.CSSProperties = {
   display: "grid",
   gap: 4,
   paddingRight: 64,
-  maxWidth: "calc(100% - 136px)"
+  maxWidth: "calc(100% - 72px)"
 };
 
 const clientCellStatusWrapStyle: React.CSSProperties = {
@@ -1276,17 +1214,6 @@ const placeCellTextStyle: React.CSSProperties = {
   display: "block",
   paddingRight: 24,
   maxWidth: "calc(100% - 120px)"
-};
-
-const placeCellMiddleStyle: React.CSSProperties = {
-  position: "absolute",
-  left: "50%",
-  top: "50%",
-  transform: "translate(-50%, -50%)",
-  display: "flex",
-  justifyContent: "center",
-  alignItems: "center",
-  zIndex: 1
 };
 
 const clientPhoneStyle: React.CSSProperties = {
@@ -1321,27 +1248,6 @@ const clientOkStatusStyle: React.CSSProperties = {
   fontSize: 18,
   fontWeight: 900,
   boxShadow: "0 8px 16px rgba(36, 81, 58, 0.12)"
-};
-
-const centerActionButtonStyle: React.CSSProperties = {
-  minWidth: 98,
-  minHeight: 44,
-  padding: "9px 16px",
-  borderRadius: 14,
-  border: "1px solid #cfbeac",
-  background: "#fff2df",
-  color: "#4f3b2f",
-  fontWeight: 800,
-  fontSize: 14,
-  lineHeight: 1.1,
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  textAlign: "center",
-  justifySelf: "center",
-  boxSizing: "border-box",
-  boxShadow: "0 6px 14px rgba(73, 48, 34, 0.08)",
-  cursor: "pointer"
 };
 
 const miniActionButtonStyle: React.CSSProperties = {
