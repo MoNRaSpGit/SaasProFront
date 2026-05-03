@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import { ModelUserMenu } from "../../shared/components/ModelUserMenu";
 import {
+  archiveCamionesClient,
   archiveCamionesPlace,
   createCamionesClient as createCamionesClientRequest,
   createCamionesPlace as createCamionesPlaceRequest,
@@ -10,12 +11,16 @@ import {
   listCamionesPlaces,
   listCamionesTrips,
   markCamionesTripPaid as markCamionesTripPaidRequest,
-  updateCamionesPlace
+  updateCamionesClient,
+  updateCamionesPlace,
+  updateCamionesTrip
 } from "./camiones.client";
 import { CamionesClient, CamionesPlace, CamionesTrip } from "./camiones.types";
 
 type CamionesTab = "cliente" | "viaje" | "registro";
+type ClientModalState = { mode: "create" | "edit"; clientId: number | null } | null;
 type PlaceModalState = { mode: "create" | "edit"; placeId: number | null } | null;
+type TripModalState = { tripId: number } | null;
 type TripFilter = "all" | "pending" | "paid";
 
 function getTodayDate() {
@@ -64,17 +69,89 @@ export function CamionesHomePage() {
   const [savingTrip, setSavingTrip] = useState(false);
   const [savingClient, setSavingClient] = useState(false);
   const [savingPlace, setSavingPlace] = useState(false);
+  const [savingTripEdit, setSavingTripEdit] = useState(false);
+  const [deletingClient, setDeletingClient] = useState(false);
   const [markingPaidId, setMarkingPaidId] = useState<number | null>(null);
   const [archivingPlaceId, setArchivingPlaceId] = useState<number | null>(null);
-  const [clientModalOpen, setClientModalOpen] = useState(false);
+  const [clientModalState, setClientModalState] = useState<ClientModalState>(null);
   const [clientDraftName, setClientDraftName] = useState("");
   const [clientDraftPhone, setClientDraftPhone] = useState("");
+  const [clientDeleteConfirmOpen, setClientDeleteConfirmOpen] = useState(false);
   const [placeModalState, setPlaceModalState] = useState<PlaceModalState>(null);
   const [placeDraftName, setPlaceDraftName] = useState("");
+  const [tripModalState, setTripModalState] = useState<TripModalState>(null);
+  const [tripDraftDate, setTripDraftDate] = useState("");
+  const [tripDraftPlace, setTripDraftPlace] = useState("");
+  const [tripDraftKilometers, setTripDraftKilometers] = useState("");
+
+  const refreshTrips = useCallback(async () => {
+    setTripsLoading(true);
+    try {
+      const payload = await listCamionesTrips({ limit: 100 });
+      setTrips(payload.items);
+      setTripsLoaded(true);
+    } finally {
+      setTripsLoading(false);
+    }
+  }, []);
+
+  const refreshPlaces = useCallback(async () => {
+    setPlacesLoading(true);
+    try {
+      const payload = await listCamionesPlaces({ limit: 100 });
+      setPlaces(payload.items);
+      setPlacesLoaded(true);
+    } finally {
+      setPlacesLoading(false);
+    }
+  }, []);
+
+  const ensurePlacesLoaded = useCallback(async () => {
+    if (placesLoaded || placesLoading) {
+      return;
+    }
+
+    try {
+      await refreshPlaces();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudieron cargar los lugares");
+    }
+  }, [placesLoaded, placesLoading, refreshPlaces]);
+
+  const ensureTripsLoaded = useCallback(async () => {
+    if (tripsLoaded || tripsLoading) {
+      return;
+    }
+
+    try {
+      await refreshTrips();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo cargar el registro");
+    }
+  }, [refreshTrips, tripsLoaded, tripsLoading]);
+
+  const loadInitialClients = useCallback(async () => {
+    setClientsLoading(true);
+
+    try {
+      const clientsPayload = await listCamionesClients({ limit: 100 });
+      setClients(clientsPayload.items);
+      void ensureTripsLoaded();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo cargar camiones");
+    } finally {
+      setClientsLoading(false);
+    }
+  }, [ensureTripsLoaded]);
+
+  async function refreshClients() {
+    const payload = await listCamionesClients({ limit: 100 });
+    setClients(payload.items);
+  }
 
   useEffect(() => {
     void loadInitialClients();
-  }, []);
+  }, [loadInitialClients]);
 
   useEffect(() => {
     if (tab === "cliente") {
@@ -89,72 +166,7 @@ export function CamionesHomePage() {
     if (tab === "registro") {
       void ensureTripsLoaded();
     }
-  }, [tab]);
-
-  async function loadInitialClients() {
-    setClientsLoading(true);
-
-    try {
-      const clientsPayload = await listCamionesClients({ limit: 100 });
-      setClients(clientsPayload.items);
-      void ensureTripsLoaded();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo cargar camiones");
-    } finally {
-      setClientsLoading(false);
-    }
-  }
-
-  async function refreshClients() {
-    const payload = await listCamionesClients({ limit: 100 });
-    setClients(payload.items);
-  }
-
-  async function refreshTrips() {
-    setTripsLoading(true);
-    try {
-      const payload = await listCamionesTrips({ limit: 100 });
-      setTrips(payload.items);
-      setTripsLoaded(true);
-    } finally {
-      setTripsLoading(false);
-    }
-  }
-
-  async function refreshPlaces() {
-    setPlacesLoading(true);
-    try {
-      const payload = await listCamionesPlaces({ limit: 100 });
-      setPlaces(payload.items);
-      setPlacesLoaded(true);
-    } finally {
-      setPlacesLoading(false);
-    }
-  }
-
-  async function ensurePlacesLoaded() {
-    if (placesLoaded || placesLoading) {
-      return;
-    }
-
-    try {
-      await refreshPlaces();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudieron cargar los lugares");
-    }
-  }
-
-  async function ensureTripsLoaded() {
-    if (tripsLoaded || tripsLoading) {
-      return;
-    }
-
-    try {
-      await refreshTrips();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo cargar el registro");
-    }
-  }
+  }, [ensurePlacesLoaded, ensureTripsLoaded, tab]);
 
   const clientPendingTripMap = useMemo(() => {
     const pendingByClientId = new Map<number, boolean>();
@@ -227,17 +239,24 @@ export function CamionesHomePage() {
   function openClientCreateModal() {
     setClientDraftName(clientSearch.trim());
     setClientDraftPhone("");
-    setClientModalOpen(true);
+    setClientModalState({ mode: "create", clientId: null });
+  }
+
+  function openClientEditModal(client: CamionesClient) {
+    setClientDraftName(client.name);
+    setClientDraftPhone(client.phone || "");
+    setClientModalState({ mode: "edit", clientId: client.id });
   }
 
   function closeClientModal() {
-    if (savingClient) {
+    if (savingClient || deletingClient) {
       return;
     }
 
-    setClientModalOpen(false);
+    setClientModalState(null);
     setClientDraftName("");
     setClientDraftPhone("");
+    setClientDeleteConfirmOpen(false);
   }
 
   function openPlaceCreateModal() {
@@ -259,6 +278,24 @@ export function CamionesHomePage() {
     setPlaceDraftName("");
   }
 
+  function openTripEditModal(trip: CamionesTrip) {
+    setTripDraftDate(trip.tripDate.includes("T") ? trip.tripDate.slice(0, 10) : trip.tripDate);
+    setTripDraftPlace(trip.place);
+    setTripDraftKilometers(String(trip.kilometers));
+    setTripModalState({ tripId: trip.id });
+  }
+
+  function closeTripModal() {
+    if (savingTripEdit) {
+      return;
+    }
+
+    setTripModalState(null);
+    setTripDraftDate("");
+    setTripDraftPlace("");
+    setTripDraftKilometers("");
+  }
+
   async function handleSaveClient() {
     const name = clientDraftName.trim();
     if (!name) {
@@ -269,18 +306,25 @@ export function CamionesHomePage() {
     setSavingClient(true);
 
     try {
-      const payload = await createCamionesClientRequest({
-        name,
-        phone: clientDraftPhone.trim() || undefined
-      });
+      const payload =
+        clientModalState?.mode === "edit" && clientModalState.clientId
+          ? await updateCamionesClient(clientModalState.clientId, {
+              name,
+              phone: clientDraftPhone.trim() || undefined
+            })
+          : await createCamionesClientRequest({
+              name,
+              phone: clientDraftPhone.trim() || undefined
+            });
 
       await refreshClients();
+      await refreshTrips();
       setSelectedClient(payload.item);
       setClientSearch(payload.item.name);
       closeClientModal();
-      toast.success(`Cliente agregado: ${payload.item.name}`);
+      toast.success(clientModalState?.mode === "edit" ? "Cliente actualizado" : `Cliente agregado: ${payload.item.name}`);
 
-      if (tab === "cliente") {
+      if (tab === "cliente" && clientModalState?.mode !== "edit") {
         clearTripForm();
         setTab("viaje");
       }
@@ -288,6 +332,49 @@ export function CamionesHomePage() {
       toast.error(error instanceof Error ? error.message : "No se pudo guardar el cliente");
     } finally {
       setSavingClient(false);
+    }
+  }
+
+  function handleDeleteClient() {
+    if (clientModalState?.mode !== "edit") {
+      return;
+    }
+
+    setClientDeleteConfirmOpen(true);
+  }
+
+  function closeClientDeleteConfirm() {
+    if (deletingClient) {
+      return;
+    }
+
+    setClientDeleteConfirmOpen(false);
+  }
+
+  async function confirmDeleteClient() {
+    if (clientModalState?.mode !== "edit" || !clientModalState.clientId) {
+      return;
+    }
+
+    setDeletingClient(true);
+
+    try {
+      await archiveCamionesClient(clientModalState.clientId);
+      await refreshClients();
+      await refreshTrips();
+
+      if (selectedClient?.id === clientModalState.clientId) {
+        setSelectedClient(null);
+        setClientSearch("");
+      }
+
+      setClientDeleteConfirmOpen(false);
+      closeClientModal();
+      toast.success("Cliente eliminado");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo eliminar el cliente");
+    } finally {
+      setDeletingClient(false);
     }
   }
 
@@ -337,6 +424,26 @@ export function CamionesHomePage() {
     } finally {
       setArchivingPlaceId(null);
     }
+  }
+
+  async function handleDeletePlaceFromModal() {
+    if (placeModalState?.mode !== "edit" || !placeModalState.placeId) {
+      return;
+    }
+
+    const confirmed = window.confirm(`Seguro desea eliminar el lugar "${placeDraftName.trim() || "sin nombre"}"?`);
+    if (!confirmed) {
+      return;
+    }
+
+    const place = places.find((item) => item.id === placeModalState.placeId);
+    if (!place) {
+      toast.error("Lugar no encontrado");
+      return;
+    }
+
+    await handleArchivePlace(place);
+    closePlaceModal();
   }
 
   async function goToTripStep() {
@@ -417,6 +524,56 @@ export function CamionesHomePage() {
     }
   }
 
+  async function handleSaveTripVisualEdit() {
+    const tripId = tripModalState?.tripId;
+    const tripDateValue = tripDraftDate.trim();
+    const placeName = tripDraftPlace.trim();
+    const kilometersValue = Number(tripDraftKilometers);
+
+    if (!tripId) {
+      return;
+    }
+
+    if (!tripDateValue) {
+      toast.error("Falta la fecha");
+      return;
+    }
+
+    if (!placeName) {
+      toast.error("Falta el lugar");
+      return;
+    }
+
+    if (!Number.isFinite(kilometersValue) || kilometersValue <= 0) {
+      toast.error("Escribe kilometros validos");
+      return;
+    }
+
+    const matchedPlace = places.find((place) => normalizeText(place.name) === normalizeText(placeName));
+    if (!matchedPlace) {
+      toast.error("Elige un lugar existente");
+      return;
+    }
+
+    setSavingTripEdit(true);
+
+    try {
+      await updateCamionesTrip(tripId, {
+        placeId: matchedPlace.id,
+        tripDate: tripDateValue,
+        kilometers: Number(kilometersValue.toFixed(2))
+      });
+
+      await refreshTrips();
+      closeTripModal();
+      toast.success("Registro actualizado");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo actualizar el registro");
+    } finally {
+      setSavingTripEdit(false);
+    }
+  }
+
   return (
     <main
       style={{
@@ -490,20 +647,42 @@ export function CamionesHomePage() {
                           : pickerButtonStyle
                       }
                     >
-                      <span style={clientRowStyle}>
-                        <span style={{ display: "grid", gap: 4 }}>
+                      <span style={clientCellContentStyle}>
+                        <span style={clientCellTextStyle}>
                           <span>{client.name}</span>
                           <span style={clientPhoneStyle}>{client.phone || "Sin telefono"}</span>
                         </span>
-                        {clientPendingTripMap.get(client.id) ? (
-                          <span style={clientPendingStatusStyle} aria-label="Cliente con pendiente">
-                            {"\u2715"}
+                        <span style={clientCellMiddleStyle}>
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              openClientEditModal(client);
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                openClientEditModal(client);
+                              }
+                            }}
+                            style={centerActionButtonStyle}
+                          >
+                            Editar
                           </span>
-                        ) : (
-                          <span style={clientOkStatusStyle} aria-label="Cliente sin pendientes">
-                            {"\u2713"}
-                          </span>
-                        )}
+                        </span>
+                        <span style={clientCellStatusWrapStyle}>
+                          {clientPendingTripMap.get(client.id) ? (
+                            <span style={clientPendingStatusStyle} aria-label="Cliente con pendiente">
+                              {"\u2715"}
+                            </span>
+                          ) : (
+                            <span style={clientOkStatusStyle} aria-label="Cliente sin pendientes">
+                              {"\u2713"}
+                            </span>
+                          )}
+                        </span>
                       </span>
                     </button>
                   </div>
@@ -572,21 +751,30 @@ export function CamionesHomePage() {
                           : pickerButtonStyle
                       }
                     >
-                      {place.name}
+                      <span style={placeCellContentStyle}>
+                        <span style={placeCellTextStyle}>{place.name}</span>
+                        <span style={placeCellMiddleStyle}>
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              openPlaceEditModal(place);
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                openPlaceEditModal(place);
+                              }
+                            }}
+                            style={centerActionButtonStyle}
+                          >
+                            Editar
+                          </span>
+                        </span>
+                      </span>
                     </button>
-                    <div style={entityActionsStyle}>
-                      <button type="button" onClick={() => openPlaceEditModal(place)} style={miniActionButtonStyle}>
-                        Editar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void handleArchivePlace(place)}
-                        style={miniDangerButtonStyle}
-                        disabled={archivingPlaceId === place.id}
-                      >
-                        {archivingPlaceId === place.id ? "Archivando..." : "Archivar"}
-                      </button>
-                    </div>
                   </div>
                 ))}
                 {!placesLoading && filteredPlaces.length === 0 ? (
@@ -657,12 +845,17 @@ export function CamionesHomePage() {
               {!tripsLoading && filteredTrips.length === 0 ? <div style={emptyBoxStyle}>Todavia no hay viajes registrados.</div> : null}
               {filteredTrips.map((trip) => (
                 <article key={trip.id} style={trip.status === "paid" ? historyCardStyle : tripCardStyle}>
-                  <div style={{ display: "grid", gap: 4 }}>
-                    <strong style={{ fontSize: 19, color: "#2f241e" }}>{trip.clientName}</strong>
-                    <span style={tripMetaStyle}>
-                      {formatDateLabel(trip.tripDate)} - {trip.place}
-                    </span>
-                    <span style={tripKmStyle}>{trip.kilometers} km</span>
+                  <div style={tripCardTopRowStyle}>
+                    <div style={{ display: "grid", gap: 4 }}>
+                      <strong style={{ fontSize: 19, color: "#2f241e" }}>{trip.clientName}</strong>
+                      <span style={tripMetaStyle}>
+                        {formatDateLabel(trip.tripDate)} - {trip.place}
+                      </span>
+                      <span style={tripKmStyle}>{trip.kilometers} km</span>
+                    </div>
+                    <button type="button" onClick={() => openTripEditModal(trip)} style={miniActionButtonStyle}>
+                      Editar
+                    </button>
                   </div>
                   {trip.status === "paid" ? (
                     <span style={paidPillStyle}>Pago</span>
@@ -683,15 +876,17 @@ export function CamionesHomePage() {
         ) : null}
       </div>
 
-      {clientModalOpen ? (
+      {clientModalState ? (
         <div style={modalOverlayStyle} onClick={closeClientModal}>
           <section style={modalCardStyle} onClick={(event) => event.stopPropagation()}>
             <div style={{ display: "grid", gap: 6 }}>
               <h3 style={{ margin: 0, fontSize: 24, color: "#2f241e" }}>
-                Nuevo cliente
+                {clientModalState.mode === "edit" ? "Editar cliente" : "Nuevo cliente"}
               </h3>
               <p style={{ margin: 0, color: "#68594f", lineHeight: 1.5 }}>
-                Carga los datos base del cliente para empezar a usarlo en viajes.
+                {clientModalState.mode === "edit"
+                  ? "Aca ya queda lista la vista para corregir nombre, telefono o eliminar el cliente."
+                  : "Carga los datos base del cliente para empezar a usarlo en viajes."}
               </p>
             </div>
 
@@ -719,12 +914,54 @@ export function CamionesHomePage() {
               </label>
             </div>
 
-            <div style={modalActionsStyle}>
-              <button type="button" onClick={closeClientModal} style={modalCancelButtonStyle}>
+            <div style={modalActionsSplitStyle}>
+              {clientModalState.mode === "edit" ? (
+                <button type="button" onClick={handleDeleteClient} style={modalDangerButtonStyle} disabled={deletingClient}>
+                  Eliminar
+                </button>
+              ) : (
+                <span />
+              )}
+              <div style={modalActionsStyle}>
+                <button type="button" onClick={closeClientModal} style={modalCancelButtonStyle}>
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleSaveClient()}
+                  style={saveButtonStyle}
+                  disabled={savingClient || deletingClient}
+                >
+                  {savingClient ? "Guardando..." : clientModalState.mode === "edit" ? "Guardar cambios" : "Guardar cliente"}
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {clientDeleteConfirmOpen ? (
+        <div style={modalOverlayStyle} onClick={closeClientDeleteConfirm}>
+          <section style={confirmModalCardStyle} onClick={(event) => event.stopPropagation()}>
+            <div style={{ display: "grid", gap: 8 }}>
+              <h3 style={{ margin: 0, fontSize: 24, color: "#2f241e" }}>Estas seguro?</h3>
+              <p style={{ margin: 0, color: "#68594f", lineHeight: 1.5 }}>
+                Vas a eliminar el cliente <strong>{clientDraftName.trim() || "sin nombre"}</strong>. Esta accion se podra conectar
+                de forma real en el siguiente paso.
+              </p>
+            </div>
+
+            <div style={confirmActionsStyle}>
+              <button type="button" onClick={closeClientDeleteConfirm} style={modalCancelButtonStyle}>
                 Cancelar
               </button>
-              <button type="button" onClick={() => void handleSaveClient()} style={saveButtonStyle} disabled={savingClient}>
-                {savingClient ? "Guardando..." : "Guardar cliente"}
+              <button
+                type="button"
+                onClick={() => void confirmDeleteClient()}
+                style={modalDangerButtonStyle}
+                disabled={deletingClient}
+              >
+                {deletingClient ? "Eliminando..." : "Eliminar cliente"}
               </button>
             </div>
           </section>
@@ -756,12 +993,80 @@ export function CamionesHomePage() {
               </label>
             </div>
 
+            <div style={modalActionsSplitStyle}>
+              {placeModalState.mode === "edit" ? (
+                <button
+                  type="button"
+                  onClick={() => void handleDeletePlaceFromModal()}
+                  style={modalDangerButtonStyle}
+                  disabled={archivingPlaceId === placeModalState.placeId}
+                >
+                  {archivingPlaceId === placeModalState.placeId ? "Eliminando..." : "Eliminar"}
+                </button>
+              ) : (
+                <span />
+              )}
+              <div style={modalActionsStyle}>
+                <button type="button" onClick={closePlaceModal} style={modalCancelButtonStyle}>
+                  Cancelar
+                </button>
+                <button type="button" onClick={() => void handleSavePlace()} style={saveButtonStyle} disabled={savingPlace}>
+                  {savingPlace ? "Guardando..." : placeModalState.mode === "edit" ? "Guardar cambios" : "Guardar lugar"}
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {tripModalState ? (
+        <div style={modalOverlayStyle} onClick={closeTripModal}>
+          <section style={modalCardStyle} onClick={(event) => event.stopPropagation()}>
+            <div style={{ display: "grid", gap: 6 }}>
+              <h3 style={{ margin: 0, fontSize: 24, color: "#2f241e" }}>Editar registro</h3>
+              <p style={{ margin: 0, color: "#68594f", lineHeight: 1.5 }}>
+                Ya queda pronta la vista para corregir un viaje cuando se cargó algo mal.
+              </p>
+            </div>
+
+            <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
+              <label style={fieldWrapStyle}>
+                <span style={fieldLabelStyle}>Fecha</span>
+                <input type="date" value={tripDraftDate} onChange={(event) => setTripDraftDate(event.target.value)} style={inputStyle} />
+              </label>
+
+              <label style={fieldWrapStyle}>
+                <span style={fieldLabelStyle}>Lugar</span>
+                <input
+                  type="text"
+                  value={tripDraftPlace}
+                  onChange={(event) => setTripDraftPlace(event.target.value)}
+                  placeholder="Lugar del viaje"
+                  style={inputStyle}
+                />
+              </label>
+
+              <label style={fieldWrapStyle}>
+                <span style={fieldLabelStyle}>Kilometros</span>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  step="1"
+                  value={tripDraftKilometers}
+                  onChange={(event) => setTripDraftKilometers(event.target.value)}
+                  placeholder="Ej: 500"
+                  style={inputStyle}
+                />
+              </label>
+            </div>
+
             <div style={modalActionsStyle}>
-              <button type="button" onClick={closePlaceModal} style={modalCancelButtonStyle}>
+              <button type="button" onClick={closeTripModal} style={modalCancelButtonStyle}>
                 Cancelar
               </button>
-              <button type="button" onClick={() => void handleSavePlace()} style={saveButtonStyle} disabled={savingPlace}>
-                {savingPlace ? "Guardando..." : placeModalState.mode === "edit" ? "Guardar cambios" : "Guardar lugar"}
+              <button type="button" onClick={() => void handleSaveTripVisualEdit()} style={saveButtonStyle} disabled={savingTripEdit}>
+                {savingTripEdit ? "Guardando..." : "Guardar cambios"}
               </button>
             </div>
           </section>
@@ -884,6 +1189,7 @@ const pickerButtonStyle: React.CSSProperties = {
   textAlign: "left",
   fontSize: 17,
   fontWeight: 700,
+  position: "relative",
   boxShadow: "0 8px 16px rgba(73, 48, 34, 0.06)",
   cursor: "pointer"
 };
@@ -900,11 +1206,61 @@ const entityWrapStyle: React.CSSProperties = {
   gap: 6
 };
 
-const clientRowStyle: React.CSSProperties = {
+const clientCellContentStyle: React.CSSProperties = {
+  position: "relative",
+  display: "block",
+  width: "100%"
+};
+
+const clientCellMiddleStyle: React.CSSProperties = {
+  position: "absolute",
+  left: "50%",
+  top: "50%",
+  transform: "translate(-50%, -50%)",
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
+  zIndex: 1
+};
+
+const clientCellTextStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 4,
+  paddingRight: 64,
+  maxWidth: "calc(100% - 136px)"
+};
+
+const clientCellStatusWrapStyle: React.CSSProperties = {
+  position: "absolute",
+  right: 0,
+  top: "50%",
+  transform: "translateY(-50%)",
   display: "flex",
   alignItems: "center",
-  justifyContent: "space-between",
-  gap: 12
+  justifyContent: "center"
+};
+
+const placeCellContentStyle: React.CSSProperties = {
+  position: "relative",
+  display: "block",
+  width: "100%"
+};
+
+const placeCellTextStyle: React.CSSProperties = {
+  display: "block",
+  paddingRight: 24,
+  maxWidth: "calc(100% - 120px)"
+};
+
+const placeCellMiddleStyle: React.CSSProperties = {
+  position: "absolute",
+  left: "50%",
+  top: "50%",
+  transform: "translate(-50%, -50%)",
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
+  zIndex: 1
 };
 
 const clientPhoneStyle: React.CSSProperties = {
@@ -941,11 +1297,25 @@ const clientOkStatusStyle: React.CSSProperties = {
   boxShadow: "0 8px 16px rgba(36, 81, 58, 0.12)"
 };
 
-const entityActionsStyle: React.CSSProperties = {
-  display: "flex",
-  gap: 8,
-  justifyContent: "flex-end",
-  flexWrap: "wrap"
+const centerActionButtonStyle: React.CSSProperties = {
+  minWidth: 98,
+  minHeight: 44,
+  padding: "9px 16px",
+  borderRadius: 14,
+  border: "1px solid #cfbeac",
+  background: "#fff2df",
+  color: "#4f3b2f",
+  fontWeight: 800,
+  fontSize: 14,
+  lineHeight: 1.1,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  textAlign: "center",
+  justifySelf: "center",
+  boxSizing: "border-box",
+  boxShadow: "0 6px 14px rgba(73, 48, 34, 0.08)",
+  cursor: "pointer"
 };
 
 const miniActionButtonStyle: React.CSSProperties = {
@@ -958,13 +1328,6 @@ const miniActionButtonStyle: React.CSSProperties = {
   fontWeight: 700,
   fontSize: 13,
   cursor: "pointer"
-};
-
-const miniDangerButtonStyle: React.CSSProperties = {
-  ...miniActionButtonStyle,
-  border: "1px solid #f0cbc4",
-  background: "#fff2ef",
-  color: "#8a4336"
 };
 
 const saveButtonStyle: React.CSSProperties = {
@@ -1024,6 +1387,13 @@ const tripCardStyle: React.CSSProperties = {
   borderRadius: 22,
   border: "1px solid #e0d3c4",
   background: "linear-gradient(180deg, #fffaf2 0%, #f7efe3 100%)"
+};
+
+const tripCardTopRowStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "flex-start",
+  justifyContent: "space-between",
+  gap: 12
 };
 
 const historyCardStyle: React.CSSProperties = {
@@ -1096,11 +1466,32 @@ const modalCardStyle: React.CSSProperties = {
   boxShadow: "0 24px 50px rgba(26, 18, 14, 0.22)"
 };
 
+const confirmModalCardStyle: React.CSSProperties = {
+  ...modalCardStyle,
+  maxWidth: 400
+};
+
 const modalActionsStyle: React.CSSProperties = {
   display: "flex",
   justifyContent: "flex-end",
   gap: 10,
+  flexWrap: "wrap"
+};
+
+const modalActionsSplitStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 12,
   marginTop: 18,
+  flexWrap: "wrap"
+};
+
+const confirmActionsStyle: React.CSSProperties = {
+  display: "flex",
+  justifyContent: "flex-end",
+  gap: 10,
+  marginTop: 20,
   flexWrap: "wrap"
 };
 
@@ -1113,5 +1504,18 @@ const modalCancelButtonStyle: React.CSSProperties = {
   color: "#5d4a3e",
   fontWeight: 800,
   fontSize: 16,
+  cursor: "pointer"
+};
+
+const modalDangerButtonStyle: React.CSSProperties = {
+  minHeight: 52,
+  padding: "14px 16px",
+  borderRadius: 18,
+  border: "1px solid #e3b7b0",
+  background: "#c74d3d",
+  color: "#fff9f7",
+  fontWeight: 800,
+  fontSize: 16,
+  boxShadow: "0 12px 24px rgba(199, 77, 61, 0.18)",
   cursor: "pointer"
 };

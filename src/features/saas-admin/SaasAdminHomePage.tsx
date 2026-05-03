@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { getStoredUser } from "../auth/auth.client";
 import { BuildMetaCard } from "../../shared/components/BuildMetaCard";
 import { UserTopBar } from "../../shared/components/UserTopBar";
@@ -36,14 +36,10 @@ export function SaasAdminHomePage() {
   const [savingModulesTenantId, setSavingModulesTenantId] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState<"all" | SaasAdminTenantBilling["status"]>("all");
 
-  useEffect(() => {
-    void loadTenants();
-  }, []);
-
   const filteredTenants =
     statusFilter === "all" ? tenants : tenants.filter((tenant) => tenant.billing.status === statusFilter);
 
-  async function loadTenants() {
+  const loadTenants = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -70,7 +66,11 @@ export function SaasAdminHomePage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    void loadTenants();
+  }, [loadTenants]);
 
   async function handleSave(tenantId: number) {
     const draft = drafts[tenantId];
@@ -417,16 +417,6 @@ const bodyStyle: React.CSSProperties = {
   color: "rgba(247, 250, 252, 0.82)",
   lineHeight: 1.6
 };
-
-const linkButtonStyle = (primary: boolean): React.CSSProperties => ({
-  padding: "12px 16px",
-  borderRadius: 999,
-  textDecoration: "none",
-  fontWeight: 700,
-  border: primary ? "1px solid #f4d7a2" : "1px solid rgba(255,255,255,0.18)",
-  background: primary ? "#f1d8a8" : "transparent",
-  color: primary ? "#2d2110" : "#f7fafc"
-});
 
 const chipStyle: React.CSSProperties = {
   borderRadius: 999,

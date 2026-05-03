@@ -7,12 +7,11 @@ type BuildMetaCardProps = {
 
 export function BuildMetaCard({ compact = false }: BuildMetaCardProps) {
   const [backendMeta, setBackendMeta] = useState<BackendBuildMeta | null>(null);
-  const [backendStatus, setBackendStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [backendStatus, setBackendStatus] = useState<"loading" | "ready" | "error">("loading");
 
   useEffect(() => {
     let cancelled = false;
 
-    setBackendStatus("loading");
     fetchBackendBuildMeta()
       .then((meta) => {
         if (cancelled) {
@@ -68,8 +67,8 @@ export function BuildMetaCard({ compact = false }: BuildMetaCardProps) {
   );
 }
 
-function resolveBackendStatus(status: "idle" | "loading" | "ready" | "error") {
-  if (status === "loading" || status === "idle") {
+function resolveBackendStatus(status: "loading" | "ready" | "error") {
+  if (status === "loading") {
     return "cargando...";
   }
 

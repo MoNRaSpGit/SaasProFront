@@ -9,7 +9,12 @@ export default [
   {
     files: ["src/**/*.{ts,tsx}"],
     languageOptions: {
-      parser: tsParser
+      parser: tsParser,
+      parserOptions: {
+        ecmaFeatures: {
+          jsx: true
+        }
+      }
     },
     plugins: {
       "@typescript-eslint": tsPlugin,
@@ -17,9 +22,17 @@ export default [
       "react-refresh": reactRefresh
     },
     rules: {
+      "no-undef": "off",
       ...tsPlugin.configs.recommended.rules,
       ...reactHooks.configs.recommended.rules,
+      "react-hooks/set-state-in-effect": "off",
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }]
+    }
+  },
+  {
+    files: ["src/main.tsx"],
+    rules: {
+      "react-refresh/only-export-components": "off"
     }
   },
   {

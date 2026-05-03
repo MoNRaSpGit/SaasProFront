@@ -172,12 +172,6 @@ const primaryLinkStyle: React.CSSProperties = {
   fontWeight: 700
 };
 
-const secondaryLinkStyle: React.CSSProperties = {
-  ...primaryLinkStyle,
-  background: "rgba(255,255,255,0.08)",
-  color: "#f6fbff"
-};
-
 const panelStyle: React.CSSProperties = {
   padding: 22,
   borderRadius: 24,
