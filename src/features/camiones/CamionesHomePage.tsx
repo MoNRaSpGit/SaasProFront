@@ -118,6 +118,7 @@ export function CamionesHomePage() {
   const [tripDraftPlace, setTripDraftPlace] = useState("");
   const [tripDraftKilometers, setTripDraftKilometers] = useState("");
   const [visibleTripsByGroup, setVisibleTripsByGroup] = useState<Record<string, number>>({});
+  const [expandedTripGroups, setExpandedTripGroups] = useState<Record<string, boolean>>({});
   const [showTopChrome, setShowTopChrome] = useState(true);
 
   function getTempId() {
@@ -326,15 +327,24 @@ export function CamionesHomePage() {
 
   const filteredClients = useMemo(() => {
     const query = normalizeText(clientSearch);
-    if (!query) {
-      return clients;
-    }
-
-    return clients.filter((client) => {
+    const baseClients = !query
+      ? clients
+      : clients.filter((client) => {
       const phone = client.phone?.toLowerCase() || "";
       return client.name.toLowerCase().includes(query) || phone.includes(query);
     });
-  }, [clientSearch, clients]);
+
+    if (!recentClientId) {
+      return baseClients;
+    }
+
+    const recentClient = baseClients.find((client) => client.id === recentClientId);
+    if (!recentClient) {
+      return baseClients;
+    }
+
+    return [recentClient, ...baseClients.filter((client) => client.id !== recentClientId)];
+  }, [clientSearch, clients, recentClientId]);
 
   const visibleClients = useMemo(
     () => filteredClients.slice(0, visibleClientCount),
@@ -1300,6 +1310,7 @@ export function CamionesHomePage() {
               {visibleGroupedTrips.map((group) => {
                 const isGroupFullyPaid = group.items.every((trip) => trip.status === "paid");
                 const visibleTripsCount = visibleTripsByGroup[group.groupKey] ?? GROUP_TRIPS_PAGE_SIZE;
+                const isExpanded = expandedTripGroups[group.groupKey] ?? false;
                 const visibleTrips = [...group.items]
                   .map((trip, index) => ({ trip, sequence: index + 1 }))
                   .reverse()
@@ -1317,7 +1328,20 @@ export function CamionesHomePage() {
                       </span>
                     </div>
 
-                    <div style={tripStackStyle}>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setExpandedTripGroups((current) => ({
+                          ...current,
+                          [group.groupKey]: !isExpanded
+                        }))
+                      }
+                      style={groupToggleButtonStyle}
+                    >
+                      {isExpanded ? "Ocultar viajes" : "Mostrar viajes"}
+                    </button>
+
+                    {isExpanded ? <div style={tripStackStyle}>
                       {visibleTrips.map(({ trip, sequence }) => {
                         const route = getTripRouteParts(trip);
 
@@ -1374,7 +1398,7 @@ export function CamionesHomePage() {
                           Ver mas
                         </button>
                       ) : null}
-                    </div>
+                    </div> : null}
 
                     <div style={tripCardFooterStyle}>
                       <span style={tripTotalLabelStyle}>Total pendiente</span>
@@ -1991,6 +2015,18 @@ const tripCountBadgeStyle: React.CSSProperties = {
 const tripMetaStyle: React.CSSProperties = {
   color: "#6d5b4f",
   fontSize: 14
+};
+
+const groupToggleButtonStyle: React.CSSProperties = {
+  minHeight: 44,
+  padding: "12px 14px",
+  borderRadius: 16,
+  border: "1px solid #d8ccbf",
+  background: "#fff8f0",
+  color: "#5d4a3e",
+  fontWeight: 800,
+  fontSize: 14,
+  cursor: "pointer"
 };
 
 const tripStackStyle: React.CSSProperties = {
