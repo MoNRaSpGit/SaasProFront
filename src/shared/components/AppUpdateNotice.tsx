@@ -92,7 +92,7 @@ export function AppUpdateNotice() {
             <div style={{ display: "grid", gap: 6 }}>
               <strong style={{ fontSize: 16, color: "#2f241e" }}>Hay una actualizacion lista</strong>
               <span style={noticeTextStyle}>
-                Ya hay una version mas nueva de la app publicada. Puedes actualizar ahora o seguir un rato mas.
+                Ya hay una version nueva de la app publicada. Puedes actualizar ahora o seguir un rato mas.
               </span>
             </div>
             <div style={noticeActionsStyle}>
