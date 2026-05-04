@@ -82,6 +82,7 @@ export function CamionesHomePage() {
   const [places, setPlaces] = useState<CamionesPlace[]>([]);
   const [trips, setTrips] = useState<CamionesTrip[]>([]);
   const [clientSearch, setClientSearch] = useState("");
+  const [clientListExpanded, setClientListExpanded] = useState(true);
   const [visibleClientCount, setVisibleClientCount] = useState(CLIENTS_PAGE_SIZE);
   const [selectedClient, setSelectedClient] = useState<CamionesClient | null>(null);
   const [tripDate, setTripDate] = useState(getTodayDate());
@@ -360,12 +361,20 @@ export function CamionesHomePage() {
   }, [places]);
 
   const filteredTrips = useMemo(() => {
+    const todayDate = getTodayDate();
+
     return trips.filter((trip) => {
-      if (tripFilter !== "all" && trip.status !== tripFilter) {
-        return false;
+      const tripDate = trip.tripDate.includes("T") ? trip.tripDate.slice(0, 10) : trip.tripDate;
+
+      if (tripFilter === "all") {
+        return tripDate === todayDate;
       }
 
-      return true;
+      if (tripFilter === "pending") {
+        return trip.status === "pending" && tripDate !== todayDate;
+      }
+
+      return trip.status === "paid";
     });
   }, [tripFilter, trips]);
 
@@ -417,16 +426,8 @@ export function CamionesHomePage() {
   }, [filteredTrips]);
 
   const visibleGroupedTrips = useMemo(() => {
-    if (tripFilter === "pending") {
-      return groupedTrips.filter((group) => group.items.some((trip) => trip.status !== "paid"));
-    }
-
-    if (tripFilter === "paid") {
-      return groupedTrips.filter((group) => group.items.every((trip) => trip.status === "paid"));
-    }
-
-    return groupedTrips.filter((group) => group.items.some((trip) => trip.status !== "paid"));
-  }, [groupedTrips, tripFilter]);
+    return groupedTrips;
+  }, [groupedTrips]);
 
   function clearTripForm() {
     setTripDate(getTodayDate());
@@ -441,7 +442,8 @@ export function CamionesHomePage() {
 
   function selectClient(client: CamionesClient) {
     setSelectedClient(client);
-    setClientSearch(client.name);
+    setClientSearch("");
+    setClientListExpanded(true);
     clearTripForm();
     setTab("viaje");
   }
@@ -538,7 +540,8 @@ export function CamionesHomePage() {
       mode === "edit" && editingClientId ? current.map((client) => (client.id === editingClientId ? nextClient : client)) : [nextClient, ...current]
     );
     setSelectedClient(nextClient);
-    setClientSearch(nextClient.name);
+    setClientSearch("");
+    setClientListExpanded(true);
     setClientModalState(null);
     setClientDraftName("");
     setClientDraftPhone("");
@@ -611,6 +614,7 @@ export function CamionesHomePage() {
     if (selectedClient?.id === clientId) {
       setSelectedClient(null);
       setClientSearch("");
+      setClientListExpanded(true);
     }
 
     setClientDeleteConfirmOpen(false);
@@ -1014,18 +1018,29 @@ export function CamionesHomePage() {
                     value={clientSearch}
                     onChange={(event) => {
                       setClientSearch(event.target.value);
+                      setClientListExpanded(true);
                       setVisibleClientCount(CLIENTS_PAGE_SIZE);
                       setSelectedClient(null);
                     }}
                     placeholder="Escribe el cliente"
                     style={inputStyle}
                   />
+                  <button
+                    type="button"
+                    onClick={() => setClientListExpanded((current) => !current)}
+                    style={clientListToggleButtonStyle}
+                    aria-label={clientListExpanded ? "Ocultar lista de clientes" : "Mostrar lista de clientes"}
+                    aria-expanded={clientListExpanded}
+                  >
+                    {clientListExpanded ? "▴" : "▾"}
+                  </button>
                   <button type="button" onClick={openClientCreateModal} style={plusButtonStyle} aria-label="Agregar cliente">
                     +
                   </button>
                 </div>
               </label>
 
+              {clientListExpanded || clientSearch ? (
               <div style={clientListWrapStyle}>
                 {clientsLoading ? <div style={emptyBoxStyle}>Cargando clientes...</div> : null}
                 {visibleClients.map((client) => (
@@ -1033,11 +1048,7 @@ export function CamionesHomePage() {
                     <button
                       type="button"
                       onClick={() => selectClient(client)}
-                      style={
-                        selectedClient?.id === client.id || normalizeText(clientSearch) === normalizeText(client.name)
-                          ? selectedButtonStyle
-                          : pickerButtonStyle
-                      }
+                      style={selectedClient?.id === client.id ? selectedButtonStyle : pickerButtonStyle}
                     >
                       <span style={clientCellContentStyle}>
                         <span style={clientCellTextStyle}>
@@ -1072,6 +1083,7 @@ export function CamionesHomePage() {
                   </button>
                 ) : null}
               </div>
+              ) : null}
 
               <button type="button" onClick={() => void goToTripStep()} style={saveButtonStyle} disabled={savingClient}>
                 Seguir con este cliente
@@ -1647,9 +1659,22 @@ const fieldLabelStyle: React.CSSProperties = {
 
 const searchWrapStyle: React.CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "1fr auto",
+  gridTemplateColumns: "1fr auto auto",
   gap: 8,
   alignItems: "center"
+};
+
+const clientListToggleButtonStyle: React.CSSProperties = {
+  width: 54,
+  height: 54,
+  borderRadius: 18,
+  border: "1px solid #d8ccbf",
+  background: "#fff6e9",
+  color: "#5f4a3d",
+  fontSize: 24,
+  fontWeight: 800,
+  boxShadow: "0 10px 18px rgba(73, 48, 34, 0.08)",
+  cursor: "pointer"
 };
 
 const routeInputsWrapStyle: React.CSSProperties = {
