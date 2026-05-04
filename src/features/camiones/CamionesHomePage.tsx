@@ -17,7 +17,7 @@ import {
 } from "./camiones.client";
 import { CamionesClient, CamionesPlace, CamionesTrip } from "./camiones.types";
 
-type CamionesTab = "cliente" | "viaje" | "registro";
+type CamionesTab = "cliente" | "viaje" | "registro" | "localidad";
 type ClientModalState = { mode: "create" | "edit"; clientId: number | null } | null;
 type PlaceModalState = { mode: "create" | "edit"; placeId: number | null } | null;
 type TripModalState = { tripId: number } | null;
@@ -307,14 +307,8 @@ export function CamionesHomePage() {
   }, [clientSearch, clients]);
 
   const filteredPlaces = useMemo(() => {
-    const activeSearch = activeRouteField === "from" ? fromPlaceSearch : toPlaceSearch;
-    const query = normalizeText(activeSearch);
-    if (!query) {
-      return places.slice(0, 8);
-    }
-
-    return places.filter((place) => place.name.toLowerCase().includes(query));
-  }, [activeRouteField, fromPlaceSearch, places, toPlaceSearch]);
+    return places;
+  }, [places]);
 
   const filteredTrips = useMemo(() => {
     const query = normalizeText(tripSearch);
@@ -455,11 +449,6 @@ export function CamionesHomePage() {
     setClientDraftName("");
     setClientDraftPhone("");
     setClientDeleteConfirmOpen(false);
-  }
-
-  function openPlaceCreateModal() {
-    setPlaceDraftName("");
-    setPlaceModalState({ mode: "create", placeId: null });
   }
 
   function toggleRoutePicker(field: RouteField) {
@@ -674,6 +663,35 @@ export function CamionesHomePage() {
       setFromPlaceSearch(previousFromPlaceSearch);
       setSelectedToPlace(previousSelectedToPlace);
       setToPlaceSearch(previousToPlaceSearch);
+      toast.error(error instanceof Error ? error.message : "No se pudo guardar el lugar");
+    }
+  }
+
+  async function handleCreatePlaceInline() {
+    const name = placeDraftName.trim();
+    if (!name) {
+      toast.error("Escribe el lugar");
+      return;
+    }
+
+    const previousPlaces = places;
+    const nextPlace = buildOptimisticPlace(getTempId(), name);
+
+    setSavingPlace(true);
+    setPlaces((current) => [nextPlace, ...current]);
+    setPlaceDraftName("");
+    toast.success(`Lugar agregado: ${nextPlace.name}`);
+
+    try {
+      const payload = await createCamionesPlaceRequest({ name });
+      setPlaces((current) => current.map((place) => (place.id === nextPlace.id ? payload.item : place)));
+      setSavingPlace(false);
+      setTab("viaje");
+      void refreshPlaces();
+    } catch (error) {
+      setPlaces(previousPlaces);
+      setSavingPlace(false);
+      setPlaceDraftName(name);
       toast.error(error instanceof Error ? error.message : "No se pudo guardar el lugar");
     }
   }
@@ -936,7 +954,15 @@ export function CamionesHomePage() {
         <header style={heroStyle}>
           <div style={heroTopRowStyle}>
             <p style={heroEyebrowStyle}>Modelo Camiones</p>
-            <ModelUserMenu variant="dark" />
+            <ModelUserMenu
+              variant="dark"
+              menuActions={[
+                {
+                  label: "Agr. Localidad",
+                  onSelect: () => setTab("localidad")
+                }
+              ]}
+            />
           </div>
         </header>
 
@@ -1044,6 +1070,9 @@ export function CamionesHomePage() {
               <p style={{ margin: 0, color: "#68594f" }}>
                 Cliente elegido: <strong>{selectedClient?.name || clientSearch || "Sin cliente"}</strong>
               </p>
+              <button type="button" onClick={() => setTab("cliente")} style={changeClientButtonStyle}>
+                Cambiar cliente
+              </button>
             </div>
 
             <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
@@ -1149,10 +1178,6 @@ export function CamionesHomePage() {
                 </label>
               </div>
 
-              <button type="button" onClick={openPlaceCreateModal} style={addPlaceRowButtonStyle}>
-                Agregar localidad
-              </button>
-
               <label style={fieldWrapStyle}>
                 <span style={fieldLabelStyle}>Kilometros</span>
                 <input
@@ -1173,10 +1198,6 @@ export function CamionesHomePage() {
                 <input type="date" value={tripDate} onChange={(event) => setTripDate(event.target.value)} style={inputStyle} />
               </label>
 
-              <button type="button" onClick={() => setTab("cliente")} style={changeClientButtonStyle}>
-                Cambiar cliente
-              </button>
-
               <div style={tripActionRowStyle}>
                 <button type="button" onClick={() => setTab("registro")} style={secondaryActionButtonStyle}>
                   Ver registro
@@ -1184,6 +1205,41 @@ export function CamionesHomePage() {
                 <button type="button" onClick={() => void handleSaveTrip()} style={saveButtonStyle} disabled={savingTrip}>
                   {savingTrip ? "Guardando..." : "Guardar y seguir"}
                 </button>
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {tab === "localidad" ? (
+          <section style={panelStyle}>
+            <div style={{ display: "grid", gap: 8 }}>
+              <h2 style={{ margin: 0, fontSize: 24, color: "#2f241e" }}>Agregar nueva localidad</h2>
+              <p style={{ margin: 0, color: "#68594f", lineHeight: 1.5 }}>
+                Guarda una localidad nueva para dejarla disponible en origen y destino.
+              </p>
+            </div>
+
+            <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
+              <div style={inlineCreatePanelStyle}>
+                <label style={fieldWrapStyle}>
+                  <span style={fieldLabelStyle}>Nombre</span>
+                  <input
+                    type="text"
+                    value={placeDraftName}
+                    onChange={(event) => setPlaceDraftName(event.target.value)}
+                    placeholder="Ej: Piedra Sola"
+                    style={inputStyle}
+                  />
+                </label>
+
+                <div style={tripActionRowStyle}>
+                  <button type="button" onClick={() => setTab("viaje")} style={secondaryActionButtonStyle}>
+                    Volver a viaje
+                  </button>
+                  <button type="button" onClick={() => void handleCreatePlaceInline()} style={saveButtonStyle} disabled={savingPlace}>
+                    {savingPlace ? "Guardando..." : "Guardar localidad"}
+                  </button>
+                </div>
               </div>
             </div>
           </section>
@@ -1871,29 +1927,27 @@ const secondaryActionButtonStyle: React.CSSProperties = {
 };
 
 const changeClientButtonStyle: React.CSSProperties = {
-  minHeight: 40,
-  padding: "6px 4px",
-  border: "none",
-  background: "transparent",
-  color: "#8a745d",
-  fontWeight: 700,
-  fontSize: 14,
-  textAlign: "left",
-  justifySelf: "start",
-  cursor: "pointer"
+  ...secondaryActionButtonStyle,
+  width: "100%",
+  maxWidth: 320,
+  minHeight: 44,
+  padding: "10px 14px",
+  border: "1px solid #caa06a",
+  background: "#fff1dd",
+  color: "#4f3828",
+  fontSize: 15,
+  boxShadow: "0 12px 22px rgba(201, 133, 50, 0.14)",
+  justifySelf: "center"
 };
 
-const addPlaceRowButtonStyle: React.CSSProperties = {
-  minHeight: 50,
-  padding: "12px 16px",
-  borderRadius: 18,
-  border: "1px solid rgba(95, 63, 8, 0.2)",
-  background: "#c98532",
-  color: "#fffaf4",
-  fontWeight: 800,
-  fontSize: 16,
-  boxShadow: "0 12px 22px rgba(201, 133, 50, 0.18)",
-  cursor: "pointer"
+const inlineCreatePanelStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 14,
+  padding: "16px",
+  borderRadius: 24,
+  border: "1px solid rgba(95, 63, 8, 0.14)",
+  background: "#fff8ef",
+  boxShadow: "0 14px 28px rgba(95, 63, 8, 0.08)"
 };
 
 const filterWrapStyle: React.CSSProperties = {

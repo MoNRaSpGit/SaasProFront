@@ -5,6 +5,10 @@ import { getStoredUser, logoutSession } from "../../features/auth/auth.client";
 type ModelUserMenuProps = {
   maxNameLength?: number;
   showDashboardLink?: boolean;
+  menuActions?: Array<{
+    label: string;
+    onSelect: () => void;
+  }>;
   variant?: "light" | "dark";
 };
 
@@ -20,6 +24,7 @@ function buildShortUserName(value: string, maxNameLength: number) {
 export function ModelUserMenu({
   maxNameLength = 5,
   showDashboardLink = true,
+  menuActions = [],
   variant = "dark"
 }: ModelUserMenuProps) {
   const navigate = useNavigate();
@@ -34,16 +39,6 @@ export function ModelUserMenu({
 
   return (
     <div style={clusterStyle}>
-      <div style={userBadgeStyle(variant)}>
-        <span style={userIconStyle(variant)} aria-hidden="true">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M20 21a8 8 0 0 0-16 0" />
-            <circle cx="12" cy="8" r="4" />
-          </svg>
-        </span>
-        <span style={userNameStyle(variant)}>{shortUserName}</span>
-      </div>
-
       <div style={menuWrapStyle}>
         <button
           type="button"
@@ -52,13 +47,35 @@ export function ModelUserMenu({
           aria-label="Abrir menu"
           aria-expanded={menuOpen}
         >
+          <span style={userIconStyle(variant)} aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M20 21a8 8 0 0 0-16 0" />
+              <circle cx="12" cy="8" r="4" />
+            </svg>
+          </span>
+          <span style={userNameStyle(variant)}>{shortUserName}</span>
+          <span style={hamburgerWrapStyle}>
           <span style={hamburgerLineStyle(variant)} />
           <span style={hamburgerLineStyle(variant)} />
           <span style={hamburgerLineStyle(variant)} />
+          </span>
         </button>
 
         {menuOpen ? (
           <div style={menuPanelStyle}>
+            {menuActions.map((action) => (
+              <button
+                key={action.label}
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  action.onSelect();
+                }}
+                style={menuSecondaryActionStyle}
+              >
+                {action.label}
+              </button>
+            ))}
             {showDashboardLink ? (
               <Link to="/dashboard" style={menuLinkStyle} onClick={() => setMenuOpen(false)}>
                 Ir al dashboard
@@ -80,22 +97,6 @@ const clusterStyle: React.CSSProperties = {
   gap: 8,
   position: "relative"
 };
-
-const baseBadgeStyle: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 8,
-  padding: "8px 9px",
-  borderRadius: 999
-};
-
-function userBadgeStyle(variant: "light" | "dark"): React.CSSProperties {
-  return {
-    ...baseBadgeStyle,
-    background: variant === "dark" ? "rgba(255, 255, 255, 0.1)" : "#ffffff",
-    border: variant === "dark" ? "1px solid rgba(255, 255, 255, 0.14)" : "1px solid #d8e1ea"
-  };
-}
 
 function userIconStyle(variant: "light" | "dark"): React.CSSProperties {
   return {
@@ -129,19 +130,26 @@ const menuWrapStyle: React.CSSProperties = {
 
 function menuButtonStyle(variant: "light" | "dark"): React.CSSProperties {
   return {
-    width: 40,
-    height: 40,
-    borderRadius: 14,
+    minHeight: 44,
+    padding: "8px 10px",
+    borderRadius: 999,
     border: variant === "dark" ? "1px solid rgba(255, 255, 255, 0.16)" : "1px solid #d8e1ea",
     background: variant === "dark" ? "rgba(255, 255, 255, 0.1)" : "#ffffff",
     display: "inline-flex",
-    flexDirection: "column",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 4,
+    gap: 8,
     cursor: "pointer"
   };
 }
+
+const hamburgerWrapStyle: React.CSSProperties = {
+  display: "inline-flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 3,
+  marginLeft: 2
+};
 
 function hamburgerLineStyle(variant: "light" | "dark"): React.CSSProperties {
   return {
@@ -187,6 +195,17 @@ const menuActionStyle: React.CSSProperties = {
   border: "1px solid #efd8c2",
   background: "#fff3e6",
   color: "#5d2f19",
+  textAlign: "left",
+  fontWeight: 700,
+  cursor: "pointer"
+};
+
+const menuSecondaryActionStyle: React.CSSProperties = {
+  padding: "12px 14px",
+  borderRadius: 16,
+  border: "1px solid #eadfd1",
+  background: "#fffdf9",
+  color: "#2f241e",
   textAlign: "left",
   fontWeight: 700,
   cursor: "pointer"
