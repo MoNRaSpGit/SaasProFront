@@ -458,7 +458,7 @@ export function CamionesHomePage() {
   }
 
   function openPlaceCreateModal() {
-    setPlaceDraftName((activeRouteField === "from" ? fromPlaceSearch : toPlaceSearch).trim());
+    setPlaceDraftName("");
     setPlaceModalState({ mode: "create", placeId: null });
   }
 
@@ -639,22 +639,21 @@ export function CamionesHomePage() {
     setPlaces((current) =>
       mode === "edit" && editingPlaceId ? current.map((place) => (place.id === editingPlaceId ? nextPlace : place)) : [nextPlace, ...current]
     );
-    if (activeRouteField === "from") {
-      setSelectedFromPlace(nextPlace);
-      setFromPlaceSearch(nextPlace.name);
-      destinationInputRef.current?.focus();
-      setActiveRouteField("to");
-      setRoutePickerOpenField("to");
-    } else {
-      setSelectedToPlace(nextPlace);
-      setToPlaceSearch(nextPlace.name);
-      setRoutePickerOpenField("to");
+    if (mode === "edit" && editingPlaceId) {
+      if (selectedFromPlace?.id === editingPlaceId) {
+        setSelectedFromPlace(nextPlace);
+        setFromPlaceSearch(nextPlace.name);
+      }
+
+      if (selectedToPlace?.id === editingPlaceId) {
+        setSelectedToPlace(nextPlace);
+        setToPlaceSearch(nextPlace.name);
+      }
     }
     setPlaceModalState(null);
     setPlaceDraftName("");
     setSavingPlace(false);
     toast.success(mode === "edit" ? "Lugar actualizado" : `Lugar agregado: ${nextPlace.name}`);
-    kilometersInputRef.current?.focus();
 
     try {
       const payload =
@@ -662,10 +661,12 @@ export function CamionesHomePage() {
           ? await updateCamionesPlace(editingPlaceId, { name })
           : await createCamionesPlaceRequest({ name });
       setPlaces((current) => current.map((place) => (place.id === nextPlace.id ? payload.item : place)));
-      setSelectedFromPlace((current) => (current?.id === nextPlace.id ? payload.item : current));
-      setSelectedToPlace((current) => (current?.id === nextPlace.id ? payload.item : current));
-      setFromPlaceSearch((current) => (normalizeText(current) === normalizeText(nextPlace.name) ? payload.item.name : current));
-      setToPlaceSearch((current) => (normalizeText(current) === normalizeText(nextPlace.name) ? payload.item.name : current));
+      if (mode === "edit" && editingPlaceId) {
+        setSelectedFromPlace((current) => (current?.id === nextPlace.id ? payload.item : current));
+        setSelectedToPlace((current) => (current?.id === nextPlace.id ? payload.item : current));
+        setFromPlaceSearch((current) => (normalizeText(current) === normalizeText(nextPlace.name) ? payload.item.name : current));
+        setToPlaceSearch((current) => (normalizeText(current) === normalizeText(nextPlace.name) ? payload.item.name : current));
+      }
       void refreshPlaces();
     } catch (error) {
       setPlaces(previousPlaces);
