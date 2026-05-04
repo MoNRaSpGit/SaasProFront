@@ -15,6 +15,7 @@ function isNewBuildAvailable(nextBuild: FrontendBuildMeta) {
 export function AppUpdateNotice() {
   const [availableBuild, setAvailableBuild] = useState<FrontendBuildMeta | null>(null);
   const [isApplyingUpdate, setIsApplyingUpdate] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -64,7 +65,7 @@ export function AppUpdateNotice() {
     if (availableBuild?.releaseSha) {
       window.localStorage.setItem(DISMISSED_RELEASE_KEY, availableBuild.releaseSha);
     }
-    setAvailableBuild(null);
+    setIsMinimized(true);
   }
 
   function handleUpdateNow() {
@@ -81,11 +82,18 @@ export function AppUpdateNotice() {
 
   return (
     <div style={noticeWrapStyle}>
-      <section style={noticeCardStyle}>
+      <section style={isMinimized && !isApplyingUpdate ? minimizedNoticeCardStyle : noticeCardStyle}>
         {isApplyingUpdate ? (
           <div style={{ display: "grid", gap: 6 }}>
             <strong style={{ fontSize: 16, color: "#2f241e" }}>Actualizando...</strong>
             <span style={noticeTextStyle}>Estamos cargando la version nueva para dejarte entrar enseguida.</span>
+          </div>
+        ) : isMinimized ? (
+          <div style={minimizedRowStyle}>
+            <span style={minimizedTextStyle}>Actualizacion pendiente</span>
+            <button type="button" onClick={() => setIsMinimized(false)} style={minimizedActionButtonStyle}>
+              Ver
+            </button>
           </div>
         ) : (
           <>
@@ -128,10 +136,33 @@ const noticeCardStyle: React.CSSProperties = {
   boxShadow: "0 18px 34px rgba(73, 48, 34, 0.16)"
 };
 
+const minimizedNoticeCardStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 8,
+  padding: "10px 12px",
+  borderRadius: 999,
+  border: "1px solid #decfbf",
+  background: "#fffaf3",
+  boxShadow: "0 12px 22px rgba(73, 48, 34, 0.12)"
+};
+
 const noticeTextStyle: React.CSSProperties = {
   color: "#6c5848",
   fontSize: 14,
   lineHeight: 1.45
+};
+
+const minimizedRowStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 10
+};
+
+const minimizedTextStyle: React.CSSProperties = {
+  color: "#5f4a3d",
+  fontSize: 13,
+  fontWeight: 800
 };
 
 const noticeActionsStyle: React.CSSProperties = {
@@ -147,6 +178,17 @@ const laterButtonStyle: React.CSSProperties = {
   borderRadius: 14,
   border: "1px solid #d8ccbf",
   background: "#fff7ed",
+  color: "#5f4a3d",
+  fontWeight: 700,
+  cursor: "pointer"
+};
+
+const minimizedActionButtonStyle: React.CSSProperties = {
+  minHeight: 32,
+  padding: "6px 12px",
+  borderRadius: 999,
+  border: "1px solid #d8ccbf",
+  background: "#fffdf8",
   color: "#5f4a3d",
   fontWeight: 700,
   cursor: "pointer"
