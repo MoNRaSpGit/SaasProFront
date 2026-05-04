@@ -59,11 +59,6 @@ function readRouteFromNotes(notes: string | null) {
   return notes.slice(ROUTE_FROM_PREFIX.length).trim();
 }
 
-function getTripRouteLabel(trip: CamionesTrip) {
-  const fromPlace = readRouteFromNotes(trip.notes);
-  return fromPlace ? `${fromPlace} -> ${trip.place}` : trip.place;
-}
-
 function getTripRouteParts(trip: CamionesTrip) {
   const fromPlace = readRouteFromNotes(trip.notes);
   return {
@@ -75,9 +70,8 @@ function getTripRouteParts(trip: CamionesTrip) {
 export function CamionesHomePage() {
   const CLIENTS_PAGE_SIZE = 3;
   const GROUP_TRIPS_PAGE_SIZE = 3;
-  const PAID_GROUPS_PAGE_SIZE = 3;
   const clientInputRef = useRef<HTMLInputElement | null>(null);
-  const tripSectionRef = useRef<HTMLElement | null>(null);
+  const activeSectionRef = useRef<HTMLElement | null>(null);
   const lastScrollYRef = useRef(0);
   const placeInputRef = useRef<HTMLInputElement | null>(null);
   const destinationInputRef = useRef<HTMLInputElement | null>(null);
@@ -98,7 +92,6 @@ export function CamionesHomePage() {
   const [activeRouteField, setActiveRouteField] = useState<RouteField>("from");
   const [routePickerOpenField, setRoutePickerOpenField] = useState<RouteField | null>(null);
   const [kilometers, setKilometers] = useState("");
-  const [tripSearch, setTripSearch] = useState("");
   const [tripFilter, setTripFilter] = useState<TripFilter>("all");
   const [clientsLoading, setClientsLoading] = useState(true);
   const [tripsLoading, setTripsLoading] = useState(false);
@@ -122,10 +115,8 @@ export function CamionesHomePage() {
   const [tripDraftDate, setTripDraftDate] = useState("");
   const [tripDraftPlace, setTripDraftPlace] = useState("");
   const [tripDraftKilometers, setTripDraftKilometers] = useState("");
-  const [hiddenTripGroups, setHiddenTripGroups] = useState<string[]>([]);
   const [visibleTripsByGroup, setVisibleTripsByGroup] = useState<Record<string, number>>({});
-  const [visiblePaidGroupCount, setVisiblePaidGroupCount] = useState(0);
-  const [showTripChrome, setShowTripChrome] = useState(true);
+  const [showTopChrome, setShowTopChrome] = useState(true);
 
   function getTempId() {
     const nextId = tempIdRef.current;
@@ -264,42 +255,62 @@ export function CamionesHomePage() {
   useEffect(() => {
     if (tab === "cliente") {
       clientInputRef.current?.focus();
-      setShowTripChrome(true);
+      setShowTopChrome(false);
+      requestAnimationFrame(() => {
+        activeSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        lastScrollYRef.current = window.scrollY;
+      });
     }
 
     if (tab === "viaje") {
       void ensurePlacesLoaded();
-      setShowTripChrome(false);
+      setShowTopChrome(false);
       requestAnimationFrame(() => {
-        tripSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        activeSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
         lastScrollYRef.current = window.scrollY;
       });
       placeInputRef.current?.focus();
     }
 
     if (tab === "registro") {
-      setShowTripChrome(true);
+      setShowTopChrome(false);
+      requestAnimationFrame(() => {
+        activeSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        lastScrollYRef.current = window.scrollY;
+      });
       void ensureTripsLoaded();
     }
 
     if (tab === "localidad") {
-      setShowTripChrome(true);
+      setShowTopChrome(false);
+      requestAnimationFrame(() => {
+        activeSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        lastScrollYRef.current = window.scrollY;
+      });
     }
   }, [ensurePlacesLoaded, ensureTripsLoaded, tab]);
 
   useEffect(() => {
-    if (tab !== "viaje") {
+    if (!["cliente", "viaje", "registro", "localidad"].includes(tab)) {
       return;
     }
 
     function handleScroll() {
       const currentScrollY = window.scrollY;
       const delta = currentScrollY - lastScrollYRef.current;
+      const revealThreshold = tab === "registro" ? 24 : 10;
+      const hideThreshold = tab === "registro" ? 24 : 12;
+      const minHideScrollY = tab === "registro" ? 120 : 48;
 
-      if (delta <= -8) {
-        setShowTripChrome(true);
-      } else if (delta >= 8 && currentScrollY > 24) {
-        setShowTripChrome(false);
+      if (Math.abs(delta) < revealThreshold) {
+        lastScrollYRef.current = currentScrollY;
+        return;
+      }
+
+      if (!showTopChrome && delta <= -revealThreshold) {
+        setShowTopChrome(true);
+      } else if (showTopChrome && delta >= hideThreshold && currentScrollY > minHideScrollY) {
+        setShowTopChrome(false);
       }
 
       lastScrollYRef.current = currentScrollY;
@@ -309,7 +320,7 @@ export function CamionesHomePage() {
     window.addEventListener("scroll", handleScroll, { passive: true });
 
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [tab]);
+  }, [showTopChrome, tab]);
 
   const clientPendingTripMap = useMemo(() => {
     const pendingByClientId = new Map<number, boolean>();
@@ -349,20 +360,14 @@ export function CamionesHomePage() {
   }, [places]);
 
   const filteredTrips = useMemo(() => {
-    const query = normalizeText(tripSearch);
     return trips.filter((trip) => {
       if (tripFilter !== "all" && trip.status !== tripFilter) {
         return false;
       }
 
-      if (!query) {
-        return true;
-      }
-
-      const routeLabel = getTripRouteLabel(trip).toLowerCase();
-      return trip.clientName.toLowerCase().includes(query) || routeLabel.includes(query);
+      return true;
     });
-  }, [tripFilter, tripSearch, trips]);
+  }, [tripFilter, trips]);
 
   const groupedTrips = useMemo(() => {
     const groups = new Map<
@@ -408,35 +413,20 @@ export function CamionesHomePage() {
         totalKilometers: orderedItems.reduce((total, trip) => total + trip.kilometers, 0),
         pendingKilometers: orderedItems.reduce((total, trip) => (trip.status === "paid" ? total : total + trip.kilometers), 0)
       };
-    }).filter((group) => !hiddenTripGroups.includes(group.groupKey));
-  }, [filteredTrips, hiddenTripGroups]);
+    });
+  }, [filteredTrips]);
 
   const visibleGroupedTrips = useMemo(() => {
-    if (tripFilter !== "all") {
-      return groupedTrips;
+    if (tripFilter === "pending") {
+      return groupedTrips.filter((group) => group.items.some((trip) => trip.status !== "paid"));
     }
 
-    const pendingGroups = groupedTrips.filter((group) => group.items.some((trip) => trip.status !== "paid"));
-    const paidGroups = groupedTrips.filter((group) => group.items.every((trip) => trip.status === "paid"));
-
-    return [...pendingGroups, ...paidGroups.slice(0, visiblePaidGroupCount)];
-  }, [groupedTrips, tripFilter, visiblePaidGroupCount]);
-
-  const hiddenPaidGroupsCount = useMemo(() => {
-    if (tripFilter !== "all") {
-      return 0;
+    if (tripFilter === "paid") {
+      return groupedTrips.filter((group) => group.items.every((trip) => trip.status === "paid"));
     }
 
-    return groupedTrips.filter((group) => group.items.every((trip) => trip.status === "paid")).length - visiblePaidGroupCount;
-  }, [groupedTrips, tripFilter, visiblePaidGroupCount]);
-
-  useEffect(() => {
-    if (tripFilter !== "all") {
-      return;
-    }
-
-    setVisiblePaidGroupCount(0);
-  }, [tripFilter, tripSearch]);
+    return groupedTrips.filter((group) => group.items.some((trip) => trip.status !== "paid"));
+  }, [groupedTrips, tripFilter]);
 
   function clearTripForm() {
     setTripDate(getTodayDate());
@@ -963,21 +953,6 @@ export function CamionesHomePage() {
     }
   }
 
-  function handleHidePaidGroup(groupKey: string, clientName: string) {
-    const firstConfirmation = window.confirm(`El cliente ${clientName} ya pago todo. Quieres ocultar este registro?`);
-    if (!firstConfirmation) {
-      return;
-    }
-
-    const secondConfirmation = window.confirm("Seguro? Luego quedara oculto de esta vista.");
-    if (!secondConfirmation) {
-      return;
-    }
-
-    setHiddenTripGroups((current) => [...current, groupKey]);
-    toast.success("Registro ocultado");
-  }
-
   return (
     <main
       style={{
@@ -989,7 +964,7 @@ export function CamionesHomePage() {
       }}
     >
       <div style={{ maxWidth: 720, margin: "0 auto" }}>
-        {tab !== "viaje" || showTripChrome ? (
+        {showTopChrome ? (
           <>
             <header style={heroStyle}>
               <div style={heroTopRowStyle}>
@@ -1021,7 +996,7 @@ export function CamionesHomePage() {
         ) : null}
 
         {tab === "cliente" ? (
-          <section style={panelStyle}>
+          <section ref={activeSectionRef} style={panelStyle}>
             <div style={{ display: "grid", gap: 8 }}>
               <h2 style={{ margin: 0, fontSize: 24, color: "#2f241e" }}>Buscar cliente</h2>
               <p style={{ margin: 0, color: "#68594f", lineHeight: 1.5 }}>
@@ -1106,7 +1081,7 @@ export function CamionesHomePage() {
         ) : null}
 
         {tab === "viaje" ? (
-          <section ref={tripSectionRef} style={panelStyle}>
+          <section ref={activeSectionRef} style={panelStyle}>
             <div style={{ display: "grid", gap: 8 }}>
               <h2 style={{ margin: 0, fontSize: 24, color: "#2f241e" }}>Cargar viaje</h2>
               <div style={tripClientMetaStyle}>
@@ -1249,7 +1224,7 @@ export function CamionesHomePage() {
         ) : null}
 
         {tab === "localidad" ? (
-          <section style={panelStyle}>
+          <section ref={activeSectionRef} style={panelStyle}>
             <div style={{ display: "grid", gap: 8 }}>
               <h2 style={{ margin: 0, fontSize: 24, color: "#2f241e" }}>Agregar nueva localidad</h2>
               <p style={{ margin: 0, color: "#68594f", lineHeight: 1.5 }}>
@@ -1284,26 +1259,13 @@ export function CamionesHomePage() {
         ) : null}
 
         {tab === "registro" ? (
-          <section style={panelStyle}>
+          <section ref={activeSectionRef} style={panelStyle}>
             <div style={{ display: "grid", gap: 8 }}>
               <h2 style={{ margin: 0, fontSize: 24, color: "#2f241e" }}>Registro</h2>
-              <p style={{ margin: 0, color: "#68594f" }}>
-                Aca ves todos los viajes. Si uno sigue pendiente, lo cambias a `Pago` desde aca.
-              </p>
+              <p style={{ margin: 0, color: "#68594f" }}>Registro de viajes.</p>
             </div>
 
             <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
-              <label style={fieldWrapStyle}>
-                <span style={fieldLabelStyle}>Buscar</span>
-                <input
-                  type="text"
-                  value={tripSearch}
-                  onChange={(event) => setTripSearch(event.target.value)}
-                  placeholder="Cliente o recorrido"
-                  style={inputStyle}
-                />
-              </label>
-
               <div style={filterWrapStyle}>
                 <button type="button" onClick={() => setTripFilter("all")} style={tripFilter === "all" ? activeChipStyle : chipStyle}>
                   Todos
@@ -1405,29 +1367,9 @@ export function CamionesHomePage() {
                       <span style={tripTotalLabelStyle}>Total pendiente</span>
                       <span style={tripKmStyle}>{group.pendingKilometers.toFixed(0)} km</span>
                     </div>
-
-                    {isGroupFullyPaid ? (
-                      <button
-                        type="button"
-                        onClick={() => handleHidePaidGroup(group.groupKey, group.clientName)}
-                        style={hidePaidGroupButtonStyle}
-                      >
-                        Ocultar registro pago
-                      </button>
-                    ) : null}
                   </article>
                 );
               })}
-
-              {!tripsLoading && hiddenPaidGroupsCount > 0 ? (
-                <button
-                  type="button"
-                  onClick={() => setVisiblePaidGroupCount((current) => current + PAID_GROUPS_PAGE_SIZE)}
-                  style={secondaryActionButtonStyle}
-                >
-                  Ver mas registros pagos
-                </button>
-              ) : null}
             </div>
           </section>
         ) : null}
@@ -2167,17 +2109,6 @@ const tripTotalLabelStyle: React.CSSProperties = {
   textTransform: "uppercase",
   letterSpacing: "0.08em",
   color: "#8a745d"
-};
-
-const hidePaidGroupButtonStyle: React.CSSProperties = {
-  minHeight: 42,
-  padding: "10px 14px",
-  borderRadius: 16,
-  border: "1px solid #cfe1d1",
-  background: "#f6faf6",
-  color: "#24513a",
-  fontWeight: 800,
-  cursor: "pointer"
 };
 
 const paidPillStyle: React.CSSProperties = {
