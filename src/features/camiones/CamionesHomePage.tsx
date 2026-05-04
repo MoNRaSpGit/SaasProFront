@@ -74,6 +74,7 @@ function getTripRouteParts(trip: CamionesTrip) {
 
 export function CamionesHomePage() {
   const CLIENTS_PAGE_SIZE = 3;
+  const GROUP_TRIPS_PAGE_SIZE = 3;
   const clientInputRef = useRef<HTMLInputElement | null>(null);
   const placeInputRef = useRef<HTMLInputElement | null>(null);
   const destinationInputRef = useRef<HTMLInputElement | null>(null);
@@ -118,6 +119,8 @@ export function CamionesHomePage() {
   const [tripDraftDate, setTripDraftDate] = useState("");
   const [tripDraftPlace, setTripDraftPlace] = useState("");
   const [tripDraftKilometers, setTripDraftKilometers] = useState("");
+  const [hiddenTripGroups, setHiddenTripGroups] = useState<string[]>([]);
+  const [visibleTripsByGroup, setVisibleTripsByGroup] = useState<Record<string, number>>({});
 
   function getTempId() {
     const nextId = tempIdRef.current;
@@ -363,14 +366,16 @@ export function CamionesHomePage() {
         return leftTime - rightTime;
       });
 
+      const groupKey = `${group.clientId}:${group.tripDate}`;
       return {
         ...group,
+        groupKey,
         items: orderedItems,
         totalKilometers: orderedItems.reduce((total, trip) => total + trip.kilometers, 0),
         pendingKilometers: orderedItems.reduce((total, trip) => (trip.status === "paid" ? total : total + trip.kilometers), 0)
       };
-    });
-  }, [filteredTrips]);
+    }).filter((group) => !hiddenTripGroups.includes(group.groupKey));
+  }, [filteredTrips, hiddenTripGroups]);
 
   function clearTripForm() {
     setTripDate(getTodayDate());
@@ -872,6 +877,21 @@ export function CamionesHomePage() {
     }
   }
 
+  function handleHidePaidGroup(groupKey: string, clientName: string) {
+    const firstConfirmation = window.confirm(`El cliente ${clientName} ya pago todo. Quieres ocultar este registro?`);
+    if (!firstConfirmation) {
+      return;
+    }
+
+    const secondConfirmation = window.confirm("Seguro? Luego quedara oculto de esta vista.");
+    if (!secondConfirmation) {
+      return;
+    }
+
+    setHiddenTripGroups((current) => [...current, groupKey]);
+    toast.success("Registro ocultado");
+  }
+
   return (
     <main
       style={{
@@ -997,7 +1017,7 @@ export function CamionesHomePage() {
             </div>
 
             <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
-              <button type="button" onClick={() => setTab("cliente")} style={secondaryActionButtonStyle}>
+              <button type="button" onClick={() => setTab("cliente")} style={changeClientButtonStyle}>
                 Cambiar cliente
               </button>
 
@@ -1032,19 +1052,6 @@ export function CamionesHomePage() {
 
                     {routePickerOpenField === "from" ? (
                       <div style={routeDropdownStyle}>
-                        <input
-                          type="text"
-                          value={fromPlaceSearch}
-                          onChange={(event) => {
-                            setActiveRouteField("from");
-                            setRoutePickerOpenField("from");
-                            setFromPlaceSearch(event.target.value);
-                            setSelectedFromPlace(null);
-                          }}
-                          placeholder="Buscar origen"
-                          style={routeSearchInputStyle}
-                        />
-
                         <div style={routeDropdownListStyle}>
                           {placesLoading ? <div style={dropdownEmptyStyle}>Cargando lugares...</div> : null}
                           {filteredPlaces.map((place) => (
@@ -1065,10 +1072,6 @@ export function CamionesHomePage() {
                             <div style={dropdownEmptyStyle}>No hay localidades para esa busqueda.</div>
                           ) : null}
                         </div>
-
-                        <button type="button" onClick={openPlaceCreateModal} style={dropdownAddButtonStyle}>
-                          Agregar localidad
-                        </button>
                       </div>
                     ) : null}
                   </div>
@@ -1099,19 +1102,6 @@ export function CamionesHomePage() {
 
                     {routePickerOpenField === "to" ? (
                       <div style={routeDropdownStyle}>
-                        <input
-                          type="text"
-                          value={toPlaceSearch}
-                          onChange={(event) => {
-                            setActiveRouteField("to");
-                            setRoutePickerOpenField("to");
-                            setToPlaceSearch(event.target.value);
-                            setSelectedToPlace(null);
-                          }}
-                          placeholder="Buscar destino"
-                          style={routeSearchInputStyle}
-                        />
-
                         <div style={routeDropdownListStyle}>
                           {placesLoading ? <div style={dropdownEmptyStyle}>Cargando lugares...</div> : null}
                           {filteredPlaces.map((place) => (
@@ -1132,15 +1122,15 @@ export function CamionesHomePage() {
                             <div style={dropdownEmptyStyle}>No hay localidades para esa busqueda.</div>
                           ) : null}
                         </div>
-
-                        <button type="button" onClick={openPlaceCreateModal} style={dropdownAddButtonStyle}>
-                          Agregar localidad
-                        </button>
                       </div>
                     ) : null}
                   </div>
                 </label>
               </div>
+
+              <button type="button" onClick={openPlaceCreateModal} style={addPlaceRowButtonStyle}>
+                Agregar localidad
+              </button>
 
               <label style={fieldWrapStyle}>
                 <span style={fieldLabelStyle}>Kilometros</span>
@@ -1210,6 +1200,11 @@ export function CamionesHomePage() {
               {!tripsLoading && groupedTrips.length === 0 ? <div style={emptyBoxStyle}>Todavia no hay viajes registrados.</div> : null}
               {groupedTrips.map((group) => {
                 const isGroupFullyPaid = group.items.every((trip) => trip.status === "paid");
+                const visibleTripsCount = visibleTripsByGroup[group.groupKey] ?? GROUP_TRIPS_PAGE_SIZE;
+                const visibleTrips = [...group.items]
+                  .map((trip, index) => ({ trip, sequence: index + 1 }))
+                  .reverse()
+                  .slice(0, visibleTripsCount);
 
                 return (
                   <article key={`${group.clientId}-${group.tripDate}`} style={isGroupFullyPaid ? historyCardStyle : tripCardStyle}>
@@ -1224,10 +1219,7 @@ export function CamionesHomePage() {
                     </div>
 
                     <div style={tripStackStyle}>
-                      {[...group.items]
-                        .map((trip, index) => ({ trip, sequence: index + 1 }))
-                        .reverse()
-                        .map(({ trip, sequence }) => {
+                      {visibleTrips.map(({ trip, sequence }) => {
                         const route = getTripRouteParts(trip);
 
                         return (
@@ -1243,10 +1235,14 @@ export function CamionesHomePage() {
                                 <span style={tripMiniKmStyle}>{trip.kilometers} km</span>
                               </div>
 
-                              <div style={tripRouteItemFooterStyle}>
-                                <button type="button" onClick={() => openTripEditModal(trip)} style={miniActionButtonStyle}>
-                                  Editar
-                                </button>
+                            <div style={tripRouteItemFooterStyle}>
+                                {tripFilter === "all" ? (
+                                  <button type="button" onClick={() => openTripEditModal(trip)} style={miniActionButtonStyle}>
+                                    Editar
+                                  </button>
+                                ) : (
+                                  <span />
+                                )}
                                 {trip.status === "paid" ? (
                                   <span style={paidPillStyle}>Pago</span>
                                 ) : (
@@ -1264,12 +1260,37 @@ export function CamionesHomePage() {
                           </div>
                         );
                       })}
+
+                      {group.items.length > visibleTrips.length ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setVisibleTripsByGroup((current) => ({
+                              ...current,
+                              [group.groupKey]: visibleTripsCount + GROUP_TRIPS_PAGE_SIZE
+                            }))
+                          }
+                          style={secondaryActionButtonStyle}
+                        >
+                          Ver mas
+                        </button>
+                      ) : null}
                     </div>
 
                     <div style={tripCardFooterStyle}>
                       <span style={tripTotalLabelStyle}>Total pendiente</span>
                       <span style={tripKmStyle}>{group.pendingKilometers.toFixed(0)} km</span>
                     </div>
+
+                    {isGroupFullyPaid ? (
+                      <button
+                        type="button"
+                        onClick={() => handleHidePaidGroup(group.groupKey, group.clientName)}
+                        style={hidePaidGroupButtonStyle}
+                      >
+                        Ocultar registro pago
+                      </button>
+                    ) : null}
                   </article>
                 );
               })}
@@ -1601,18 +1622,6 @@ const routeDropdownStyle: React.CSSProperties = {
   boxShadow: "0 18px 34px rgba(73, 48, 34, 0.14)"
 };
 
-const routeSearchInputStyle: React.CSSProperties = {
-  width: "100%",
-  minHeight: 46,
-  padding: "10px 14px",
-  borderRadius: 18,
-  border: "1px solid #d8ccbf",
-  background: "#fffaf4",
-  color: "#3f3128",
-  fontSize: 14,
-  boxSizing: "border-box"
-};
-
 const routeDropdownListStyle: React.CSSProperties = {
   display: "grid",
   gap: 6,
@@ -1649,18 +1658,6 @@ const dropdownEmptyStyle: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   fontSize: 14
-};
-
-const dropdownAddButtonStyle: React.CSSProperties = {
-  minHeight: 46,
-  padding: "10px 14px",
-  borderRadius: 16,
-  border: "1px solid rgba(95, 63, 8, 0.2)",
-  background: "#c98532",
-  color: "#fffaf4",
-  fontWeight: 800,
-  fontSize: 15,
-  cursor: "pointer"
 };
 
 const tripActionRowStyle: React.CSSProperties = {
@@ -1811,12 +1808,12 @@ const saveButtonStyle: React.CSSProperties = {
   minHeight: 56,
   padding: "15px 16px",
   borderRadius: 18,
-  border: "1px solid rgba(16, 74, 53, 0.2)",
-  background: "#2b7a57",
-  color: "#f7fffb",
+  border: "1px solid #caa06a",
+  background: "#f8ead8",
+  color: "#4f3828",
   fontWeight: 800,
   fontSize: 17,
-  boxShadow: "0 16px 28px rgba(43, 122, 87, 0.22)",
+  boxShadow: "0 12px 22px rgba(201, 133, 50, 0.12)",
   cursor: "pointer"
 };
 
@@ -1830,6 +1827,27 @@ const secondaryActionButtonStyle: React.CSSProperties = {
   fontWeight: 800,
   fontSize: 16,
   boxShadow: "0 8px 16px rgba(73, 48, 34, 0.08)",
+  cursor: "pointer"
+};
+
+const changeClientButtonStyle: React.CSSProperties = {
+  ...secondaryActionButtonStyle,
+  border: "1px solid #caa06a",
+  background: "#fff1dd",
+  color: "#4f3828",
+  boxShadow: "0 12px 22px rgba(201, 133, 50, 0.14)"
+};
+
+const addPlaceRowButtonStyle: React.CSSProperties = {
+  minHeight: 50,
+  padding: "12px 16px",
+  borderRadius: 18,
+  border: "1px solid rgba(95, 63, 8, 0.2)",
+  background: "#c98532",
+  color: "#fffaf4",
+  fontWeight: 800,
+  fontSize: 16,
+  boxShadow: "0 12px 22px rgba(201, 133, 50, 0.18)",
   cursor: "pointer"
 };
 
@@ -1994,13 +2012,25 @@ const tripTotalLabelStyle: React.CSSProperties = {
   color: "#8a745d"
 };
 
+const hidePaidGroupButtonStyle: React.CSSProperties = {
+  minHeight: 42,
+  padding: "10px 14px",
+  borderRadius: 16,
+  border: "1px solid #cfe1d1",
+  background: "#f6faf6",
+  color: "#24513a",
+  fontWeight: 800,
+  cursor: "pointer"
+};
+
 const paidPillStyle: React.CSSProperties = {
   display: "inline-flex",
   padding: "10px 14px",
   borderRadius: 999,
-  background: "#dcefe2",
-  color: "#24513a",
-  fontWeight: 800
+  background: "#c7decf",
+  color: "#173d2a",
+  fontWeight: 800,
+  border: "1px solid rgba(23, 61, 42, 0.12)"
 };
 
 const pendingPillButtonStyle: React.CSSProperties = {
