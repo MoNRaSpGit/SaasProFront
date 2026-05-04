@@ -415,8 +415,12 @@ export function CamionesHomePage() {
   }, [filteredTrips]);
 
   const visibleGroupedTrips = useMemo(() => {
-    return groupedTrips;
-  }, [groupedTrips]);
+    if (tripFilter !== "all") {
+      return groupedTrips;
+    }
+
+    return groupedTrips.filter((group) => group.items.some((trip) => trip.status !== "paid"));
+  }, [groupedTrips, tripFilter]);
 
   function clearTripForm() {
     setTripDate(getTodayDate());
