@@ -1067,12 +1067,13 @@ export function CamionesHomePage() {
           <section style={panelStyle}>
             <div style={{ display: "grid", gap: 8 }}>
               <h2 style={{ margin: 0, fontSize: 24, color: "#2f241e" }}>Cargar viaje</h2>
-              <p style={{ margin: 0, color: "#68594f" }}>
-                Cliente elegido: <strong>{selectedClient?.name || clientSearch || "Sin cliente"}</strong>
-              </p>
-              <button type="button" onClick={() => setTab("cliente")} style={changeClientButtonStyle}>
-                Cambiar cliente
-              </button>
+              <div style={tripClientMetaStyle}>
+                <span style={tripClientMetaLabelStyle}>Cliente</span>
+                <span style={tripClientMetaValueStyle}>{selectedClient?.name || clientSearch || "Sin cliente"}</span>
+                <button type="button" onClick={() => setTab("cliente")} style={changeClientButtonStyle}>
+                  Cambiar
+                </button>
+              </div>
             </div>
 
             <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
@@ -1198,14 +1199,9 @@ export function CamionesHomePage() {
                 <input type="date" value={tripDate} onChange={(event) => setTripDate(event.target.value)} style={inputStyle} />
               </label>
 
-              <div style={tripActionRowStyle}>
-                <button type="button" onClick={() => setTab("registro")} style={secondaryActionButtonStyle}>
-                  Ver registro
-                </button>
-                <button type="button" onClick={() => void handleSaveTrip()} style={saveButtonStyle} disabled={savingTrip}>
-                  {savingTrip ? "Guardando..." : "Guardar y seguir"}
-                </button>
-              </div>
+              <button type="button" onClick={() => void handleSaveTrip()} style={saveButtonStyle} disabled={savingTrip}>
+                {savingTrip ? "Guardando..." : "Guardar"}
+              </button>
             </div>
           </section>
         ) : null}
@@ -1763,6 +1759,28 @@ const tripActionRowStyle: React.CSSProperties = {
   alignItems: "center"
 };
 
+const tripClientMetaStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  flexWrap: "wrap",
+  padding: "2px 0 4px"
+};
+
+const tripClientMetaLabelStyle: React.CSSProperties = {
+  color: "#8a745d",
+  fontSize: 12,
+  fontWeight: 700,
+  letterSpacing: "0.04em",
+  textTransform: "uppercase"
+};
+
+const tripClientMetaValueStyle: React.CSSProperties = {
+  color: "#4f3828",
+  fontSize: 14,
+  fontWeight: 700
+};
+
 const inputStyle: React.CSSProperties = {
   width: "100%",
   minHeight: 54,
@@ -1927,17 +1945,15 @@ const secondaryActionButtonStyle: React.CSSProperties = {
 };
 
 const changeClientButtonStyle: React.CSSProperties = {
-  ...secondaryActionButtonStyle,
-  width: "100%",
-  maxWidth: 320,
-  minHeight: 44,
-  padding: "10px 14px",
-  border: "1px solid #caa06a",
-  background: "#fff1dd",
-  color: "#4f3828",
-  fontSize: 15,
-  boxShadow: "0 12px 22px rgba(201, 133, 50, 0.14)",
-  justifySelf: "center"
+  minHeight: 28,
+  padding: "4px 8px",
+  borderRadius: 999,
+  border: "1px solid #d8ccbf",
+  background: "#fff8f0",
+  color: "#6b5647",
+  fontWeight: 700,
+  fontSize: 12,
+  cursor: "pointer"
 };
 
 const inlineCreatePanelStyle: React.CSSProperties = {
