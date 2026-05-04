@@ -77,6 +77,8 @@ export function CamionesHomePage() {
   const GROUP_TRIPS_PAGE_SIZE = 3;
   const PAID_GROUPS_PAGE_SIZE = 3;
   const clientInputRef = useRef<HTMLInputElement | null>(null);
+  const tripSectionRef = useRef<HTMLElement | null>(null);
+  const lastScrollYRef = useRef(0);
   const placeInputRef = useRef<HTMLInputElement | null>(null);
   const destinationInputRef = useRef<HTMLInputElement | null>(null);
   const kilometersInputRef = useRef<HTMLInputElement | null>(null);
@@ -123,6 +125,7 @@ export function CamionesHomePage() {
   const [hiddenTripGroups, setHiddenTripGroups] = useState<string[]>([]);
   const [visibleTripsByGroup, setVisibleTripsByGroup] = useState<Record<string, number>>({});
   const [visiblePaidGroupCount, setVisiblePaidGroupCount] = useState(0);
+  const [showTripChrome, setShowTripChrome] = useState(true);
 
   function getTempId() {
     const nextId = tempIdRef.current;
@@ -261,17 +264,52 @@ export function CamionesHomePage() {
   useEffect(() => {
     if (tab === "cliente") {
       clientInputRef.current?.focus();
+      setShowTripChrome(true);
     }
 
     if (tab === "viaje") {
       void ensurePlacesLoaded();
+      setShowTripChrome(false);
+      requestAnimationFrame(() => {
+        tripSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        lastScrollYRef.current = window.scrollY;
+      });
       placeInputRef.current?.focus();
     }
 
     if (tab === "registro") {
+      setShowTripChrome(true);
       void ensureTripsLoaded();
     }
+
+    if (tab === "localidad") {
+      setShowTripChrome(true);
+    }
   }, [ensurePlacesLoaded, ensureTripsLoaded, tab]);
+
+  useEffect(() => {
+    if (tab !== "viaje") {
+      return;
+    }
+
+    function handleScroll() {
+      const currentScrollY = window.scrollY;
+      const delta = currentScrollY - lastScrollYRef.current;
+
+      if (delta <= -8) {
+        setShowTripChrome(true);
+      } else if (delta >= 8 && currentScrollY > 24) {
+        setShowTripChrome(false);
+      }
+
+      lastScrollYRef.current = currentScrollY;
+    }
+
+    lastScrollYRef.current = window.scrollY;
+    window.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [tab]);
 
   const clientPendingTripMap = useMemo(() => {
     const pendingByClientId = new Map<number, boolean>();
@@ -951,32 +989,36 @@ export function CamionesHomePage() {
       }}
     >
       <div style={{ maxWidth: 720, margin: "0 auto" }}>
-        <header style={heroStyle}>
-          <div style={heroTopRowStyle}>
-            <p style={heroEyebrowStyle}>Modelo Camiones</p>
-            <ModelUserMenu
-              variant="dark"
-              menuActions={[
-                {
-                  label: "Agr. Localidad",
-                  onSelect: () => setTab("localidad")
-                }
-              ]}
-            />
-          </div>
-        </header>
+        {tab !== "viaje" || showTripChrome ? (
+          <>
+            <header style={heroStyle}>
+              <div style={heroTopRowStyle}>
+                <p style={heroEyebrowStyle}>Modelo Camiones</p>
+                <ModelUserMenu
+                  variant="dark"
+                  menuActions={[
+                    {
+                      label: "Agr. Localidad",
+                      onSelect: () => setTab("localidad")
+                    }
+                  ]}
+                />
+              </div>
+            </header>
 
-        <section style={tabsWrapStyle}>
-          <button type="button" onClick={() => setTab("cliente")} style={tab === "cliente" ? activeTabStyle : tabStyle}>
-            Cliente
-          </button>
-          <button type="button" onClick={() => setTab("viaje")} style={tab === "viaje" ? activeTabStyle : tabStyle}>
-            Viaje
-          </button>
-          <button type="button" onClick={() => setTab("registro")} style={tab === "registro" ? activeTabStyle : tabStyle}>
-            Registro
-          </button>
-        </section>
+            <section style={tabsWrapStyle}>
+              <button type="button" onClick={() => setTab("cliente")} style={tab === "cliente" ? activeTabStyle : tabStyle}>
+                Cliente
+              </button>
+              <button type="button" onClick={() => setTab("viaje")} style={tab === "viaje" ? activeTabStyle : tabStyle}>
+                Viaje
+              </button>
+              <button type="button" onClick={() => setTab("registro")} style={tab === "registro" ? activeTabStyle : tabStyle}>
+                Registro
+              </button>
+            </section>
+          </>
+        ) : null}
 
         {tab === "cliente" ? (
           <section style={panelStyle}>
@@ -1064,7 +1106,7 @@ export function CamionesHomePage() {
         ) : null}
 
         {tab === "viaje" ? (
-          <section style={panelStyle}>
+          <section ref={tripSectionRef} style={panelStyle}>
             <div style={{ display: "grid", gap: 8 }}>
               <h2 style={{ margin: 0, fontSize: 24, color: "#2f241e" }}>Cargar viaje</h2>
               <div style={tripClientMetaStyle}>
