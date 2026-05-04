@@ -85,6 +85,7 @@ export function CamionesHomePage() {
   const [clientListExpanded, setClientListExpanded] = useState(false);
   const [visibleClientCount, setVisibleClientCount] = useState(CLIENTS_PAGE_SIZE);
   const [selectedClient, setSelectedClient] = useState<CamionesClient | null>(null);
+  const [recentClientId, setRecentClientId] = useState<number | null>(null);
   const [tripDate, setTripDate] = useState(getTodayDate());
   const [fromPlaceSearch, setFromPlaceSearch] = useState("");
   const [selectedFromPlace, setSelectedFromPlace] = useState<CamionesPlace | null>(null);
@@ -527,7 +528,12 @@ export function CamionesHomePage() {
     setClients((current) =>
       mode === "edit" && editingClientId ? current.map((client) => (client.id === editingClientId ? nextClient : client)) : [nextClient, ...current]
     );
-    setSelectedClient(nextClient);
+    if (mode === "edit") {
+      setSelectedClient(nextClient);
+    } else {
+      setSelectedClient(null);
+      setRecentClientId(nextClient.id);
+    }
     setClientSearch("");
     setClientListExpanded(true);
     setClientModalState(null);
@@ -539,7 +545,7 @@ export function CamionesHomePage() {
 
     if (previousTab === "cliente" && mode !== "edit") {
       clearTripForm();
-      setTab("viaje");
+      clientInputRef.current?.focus();
     }
 
     try {
@@ -555,6 +561,7 @@ export function CamionesHomePage() {
             });
       setClients((current) => current.map((client) => (client.id === nextClient.id ? payload.item : client)));
       setSelectedClient((current) => (current?.id === nextClient.id ? payload.item : current));
+      setRecentClientId((current) => (current === nextClient.id ? payload.item.id : current));
       setClientSearch((current) => (normalizeText(current) === normalizeText(nextClient.name) ? payload.item.name : current));
       void refreshClients();
       void refreshTrips();
@@ -562,6 +569,7 @@ export function CamionesHomePage() {
       setClients(previousClients);
       setTrips(previousTrips);
       setSelectedClient(previousSelectedClient);
+      setRecentClientId(null);
       setClientSearch(previousClientSearch);
       setTab(previousTab);
       toast.error(error instanceof Error ? error.message : "No se pudo guardar el cliente");
@@ -603,6 +611,10 @@ export function CamionesHomePage() {
       setSelectedClient(null);
       setClientSearch("");
       setClientListExpanded(true);
+    }
+
+    if (recentClientId === clientId) {
+      setRecentClientId(null);
     }
 
     setClientDeleteConfirmOpen(false);
@@ -1038,7 +1050,13 @@ export function CamionesHomePage() {
                     <button
                       type="button"
                       onClick={() => selectClient(client)}
-                      style={selectedClient?.id === client.id ? selectedButtonStyle : pickerButtonStyle}
+                      style={
+                        selectedClient?.id === client.id
+                          ? selectedButtonStyle
+                          : recentClientId === client.id
+                            ? recentClientButtonStyle
+                            : pickerButtonStyle
+                      }
                     >
                       <span style={clientCellContentStyle}>
                         <span style={clientCellTextStyle}>
@@ -1810,6 +1828,13 @@ const selectedButtonStyle: React.CSSProperties = {
   border: "1px solid #c98532",
   background: "#fff0dc",
   boxShadow: "0 12px 24px rgba(201, 133, 50, 0.14)"
+};
+
+const recentClientButtonStyle: React.CSSProperties = {
+  ...pickerButtonStyle,
+  border: "1px dashed #caa06a",
+  background: "#fff7ea",
+  boxShadow: "0 10px 20px rgba(201, 133, 50, 0.1)"
 };
 
 const entityWrapStyle: React.CSSProperties = {
