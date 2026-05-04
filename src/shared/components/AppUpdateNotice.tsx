@@ -86,7 +86,6 @@ export function AppUpdateNotice() {
         {isApplyingUpdate ? (
           <div style={{ display: "grid", gap: 6 }}>
             <strong style={{ fontSize: 16, color: "#2f241e" }}>Actualizando...</strong>
-            <span style={noticeTextStyle}>Estamos cargando la version nueva para dejarte entrar enseguida.</span>
           </div>
         ) : isMinimized ? (
           <div style={minimizedRowStyle}>
@@ -98,10 +97,7 @@ export function AppUpdateNotice() {
         ) : (
           <>
             <div style={{ display: "grid", gap: 6 }}>
-              <strong style={{ fontSize: 16, color: "#2f241e" }}>Hay una actualizacion lista</strong>
-              <span style={noticeTextStyle}>
-                Ya hay una version nueva de la app publicada. Puedes actualizar ahora o seguir un rato mas.
-              </span>
+              <strong style={{ fontSize: 16, color: "#2f241e" }}>Nueva actualizacion</strong>
             </div>
             <div style={noticeActionsStyle}>
               <button type="button" onClick={handleLater} style={laterButtonStyle}>
@@ -144,12 +140,6 @@ const minimizedNoticeCardStyle: React.CSSProperties = {
   border: "1px solid #decfbf",
   background: "#fffaf3",
   boxShadow: "0 12px 22px rgba(73, 48, 34, 0.12)"
-};
-
-const noticeTextStyle: React.CSSProperties = {
-  color: "#6c5848",
-  fontSize: 14,
-  lineHeight: 1.45
 };
 
 const minimizedRowStyle: React.CSSProperties = {
