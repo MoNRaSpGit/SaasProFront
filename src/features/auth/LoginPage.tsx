@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { API_BASE_URL } from "../../shared/config/api";
 import { BuildMetaCard } from "../../shared/components/BuildMetaCard";
@@ -16,29 +16,51 @@ export function LoginPage() {
   const navigate = useNavigate();
   const [apiError, setApiError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [prefetchedSession, setPrefetchedSession] = useState<LoginResponse | null>(null);
+  const loginPromiseRef = useRef<Promise<LoginResponse> | null>(null);
+
+  const performLoginRequest = useCallback(async () => {
+    const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(CAMIONES_DEMO_ACCESS)
+    });
+
+    const payload = (await response.json()) as LoginResponse | { message?: string | string[] };
+    if (!response.ok) {
+      const rawMessage = "message" in payload ? payload.message : null;
+      const message = Array.isArray(rawMessage) ? rawMessage.join(", ") : rawMessage || "Error al iniciar sesion";
+      throw new Error(message);
+    }
+
+    return payload as LoginResponse;
+  }, []);
+
+  const startLoginPrefetch = useCallback(() => {
+    if (loginPromiseRef.current || prefetchedSession) {
+      return loginPromiseRef.current;
+    }
+
+    const promise = performLoginRequest()
+      .then((session) => {
+        setPrefetchedSession(session);
+        return session;
+      })
+      .catch((error) => {
+        loginPromiseRef.current = null;
+        throw error;
+      });
+
+    loginPromiseRef.current = promise;
+    return promise;
+  }, [performLoginRequest, prefetchedSession]);
 
   const handleLogin = async () => {
     setApiError(null);
     setIsSubmitting(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(CAMIONES_DEMO_ACCESS)
-      });
-
-      const payload = (await response.json()) as LoginResponse | { message?: string | string[] };
-      if (!response.ok) {
-        const rawMessage = "message" in payload ? payload.message : null;
-        const message = Array.isArray(rawMessage)
-          ? rawMessage.join(", ")
-          : rawMessage || "Error al iniciar sesion";
-        setApiError(message);
-        return;
-      }
-
-      const data = payload as LoginResponse;
+      const data = prefetchedSession ?? (await (loginPromiseRef.current ?? startLoginPrefetch() ?? performLoginRequest()));
       const camionesOnlySession: LoginResponse = {
         ...data,
         tenantContext: data.tenantContext
@@ -51,8 +73,10 @@ export function LoginPage() {
 
       saveSession(camionesOnlySession);
       navigate("/camiones");
-    } catch {
-      setApiError("No se pudo conectar al backend.");
+    } catch (error) {
+      loginPromiseRef.current = null;
+      setPrefetchedSession(null);
+      setApiError(error instanceof Error ? error.message : "No se pudo conectar al backend.");
     } finally {
       setIsSubmitting(false);
     }
@@ -66,13 +90,21 @@ export function LoginPage() {
           <h1 style={titleStyle}>Login</h1>
         </div>
 
-        <button type="button" onClick={() => void handleLogin()} disabled={isSubmitting} style={submitButtonStyle}>
+        <button
+          type="button"
+          onMouseEnter={() => void startLoginPrefetch()}
+          onFocus={() => void startLoginPrefetch()}
+          onPointerDown={() => void startLoginPrefetch()}
+          onClick={() => void handleLogin()}
+          disabled={isSubmitting}
+          style={submitButtonStyle}
+        >
           {isSubmitting ? "Entrando..." : "Login"}
         </button>
 
         {apiError ? <div style={errorBoxStyle}>{apiError}</div> : null}
 
-        <BuildMetaCard compact />
+        {!isSubmitting ? <BuildMetaCard compact /> : null}
       </section>
     </main>
   );

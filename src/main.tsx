@@ -5,6 +5,7 @@ import { BrowserRouter, HashRouter } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { App } from "./app/App";
+import { AppUpdateNotice } from "./shared/components/AppUpdateNotice";
 import "./styles/toastify-overrides.css";
 
 const queryClient = new QueryClient();
@@ -15,6 +16,7 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     <QueryClientProvider client={queryClient}>
       <Router>
         <App />
+        <AppUpdateNotice />
         <ToastContainer
           position="bottom-right"
           autoClose={2400}

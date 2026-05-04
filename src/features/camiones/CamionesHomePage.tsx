@@ -22,6 +22,8 @@ type ClientModalState = { mode: "create" | "edit"; clientId: number | null } | n
 type PlaceModalState = { mode: "create" | "edit"; placeId: number | null } | null;
 type TripModalState = { tripId: number } | null;
 type TripFilter = "all" | "pending" | "paid";
+type RouteField = "from" | "to";
+const ROUTE_FROM_PREFIX = "route-from::";
 
 function getTodayDate() {
   const now = new Date();
@@ -45,11 +47,38 @@ function normalizeText(value: string) {
   return value.trim().toLowerCase();
 }
 
+function buildRouteNotes(fromPlaceName: string) {
+  return `${ROUTE_FROM_PREFIX}${fromPlaceName.trim()}`;
+}
+
+function readRouteFromNotes(notes: string | null) {
+  if (!notes || !notes.startsWith(ROUTE_FROM_PREFIX)) {
+    return "";
+  }
+
+  return notes.slice(ROUTE_FROM_PREFIX.length).trim();
+}
+
+function getTripRouteLabel(trip: CamionesTrip) {
+  const fromPlace = readRouteFromNotes(trip.notes);
+  return fromPlace ? `${fromPlace} -> ${trip.place}` : trip.place;
+}
+
+function getTripRouteParts(trip: CamionesTrip) {
+  const fromPlace = readRouteFromNotes(trip.notes);
+  return {
+    from: fromPlace || "Sin origen",
+    to: trip.place || "Sin destino"
+  };
+}
+
 export function CamionesHomePage() {
   const CLIENTS_PAGE_SIZE = 3;
   const clientInputRef = useRef<HTMLInputElement | null>(null);
   const placeInputRef = useRef<HTMLInputElement | null>(null);
+  const destinationInputRef = useRef<HTMLInputElement | null>(null);
   const kilometersInputRef = useRef<HTMLInputElement | null>(null);
+  const tempIdRef = useRef(-1);
   const [tab, setTab] = useState<CamionesTab>("cliente");
   const [clients, setClients] = useState<CamionesClient[]>([]);
   const [places, setPlaces] = useState<CamionesPlace[]>([]);
@@ -58,8 +87,12 @@ export function CamionesHomePage() {
   const [visibleClientCount, setVisibleClientCount] = useState(CLIENTS_PAGE_SIZE);
   const [selectedClient, setSelectedClient] = useState<CamionesClient | null>(null);
   const [tripDate, setTripDate] = useState(getTodayDate());
-  const [placeSearch, setPlaceSearch] = useState("");
-  const [selectedPlace, setSelectedPlace] = useState<CamionesPlace | null>(null);
+  const [fromPlaceSearch, setFromPlaceSearch] = useState("");
+  const [selectedFromPlace, setSelectedFromPlace] = useState<CamionesPlace | null>(null);
+  const [toPlaceSearch, setToPlaceSearch] = useState("");
+  const [selectedToPlace, setSelectedToPlace] = useState<CamionesPlace | null>(null);
+  const [activeRouteField, setActiveRouteField] = useState<RouteField>("from");
+  const [routePickerOpenField, setRoutePickerOpenField] = useState<RouteField | null>(null);
   const [kilometers, setKilometers] = useState("");
   const [tripSearch, setTripSearch] = useState("");
   const [tripFilter, setTripFilter] = useState<TripFilter>("all");
@@ -85,6 +118,71 @@ export function CamionesHomePage() {
   const [tripDraftDate, setTripDraftDate] = useState("");
   const [tripDraftPlace, setTripDraftPlace] = useState("");
   const [tripDraftKilometers, setTripDraftKilometers] = useState("");
+
+  function getTempId() {
+    const nextId = tempIdRef.current;
+    tempIdRef.current -= 1;
+    return nextId;
+  }
+
+  function buildOptimisticClient(id: number, name: string, phone: string): CamionesClient {
+    const timestamp = new Date().toISOString();
+    const source = selectedClient ?? clients[0];
+    return {
+      id,
+      tenantId: source?.tenantId ?? 0,
+      branchId: source?.branchId ?? null,
+      name,
+      phone: phone || null,
+      notes: null,
+      isActive: true,
+      createdAt: timestamp,
+      updatedAt: timestamp
+    };
+  }
+
+  function buildOptimisticPlace(id: number, name: string): CamionesPlace {
+    const timestamp = new Date().toISOString();
+    const source = selectedToPlace ?? selectedFromPlace ?? places[0];
+    return {
+      id,
+      tenantId: source?.tenantId ?? 0,
+      branchId: source?.branchId ?? null,
+      name,
+      notes: null,
+      isActive: true,
+      createdAt: timestamp,
+      updatedAt: timestamp
+    };
+  }
+
+  function buildOptimisticTrip(
+    client: CamionesClient,
+    fromPlace: CamionesPlace,
+    toPlace: CamionesPlace,
+    date: string,
+    tripKilometers: number
+  ): CamionesTrip {
+    const timestamp = new Date().toISOString();
+    const source = trips[0];
+    return {
+      id: getTempId(),
+      tenantId: client.tenantId || source?.tenantId || 0,
+      branchId: client.branchId ?? source?.branchId ?? null,
+      userId: source?.userId ?? 0,
+      clientId: client.id,
+      placeId: toPlace.id,
+      clientName: client.name,
+      tripDate: date,
+      place: toPlace.name,
+      kilometers: Number(tripKilometers.toFixed(2)),
+      status: "pending",
+      notes: buildRouteNotes(fromPlace.name),
+      updatedAt: timestamp,
+      createdAt: timestamp,
+      paidAt: null
+    };
+  }
 
   const refreshTrips = useCallback(async () => {
     setTripsLoading(true);
@@ -204,13 +302,14 @@ export function CamionesHomePage() {
   }, [clientSearch, clients]);
 
   const filteredPlaces = useMemo(() => {
-    const query = normalizeText(placeSearch);
+    const activeSearch = activeRouteField === "from" ? fromPlaceSearch : toPlaceSearch;
+    const query = normalizeText(activeSearch);
     if (!query) {
       return places.slice(0, 8);
     }
 
     return places.filter((place) => place.name.toLowerCase().includes(query));
-  }, [placeSearch, places]);
+  }, [activeRouteField, fromPlaceSearch, places, toPlaceSearch]);
 
   const filteredTrips = useMemo(() => {
     const query = normalizeText(tripSearch);
@@ -223,14 +322,64 @@ export function CamionesHomePage() {
         return true;
       }
 
-      return trip.clientName.toLowerCase().includes(query) || trip.place.toLowerCase().includes(query);
+      const routeLabel = getTripRouteLabel(trip).toLowerCase();
+      return trip.clientName.toLowerCase().includes(query) || routeLabel.includes(query);
     });
   }, [tripFilter, tripSearch, trips]);
 
+  const groupedTrips = useMemo(() => {
+    const groups = new Map<
+      string,
+      {
+        clientId: number;
+        clientName: string;
+        tripDate: string;
+        items: CamionesTrip[];
+      }
+    >();
+
+    for (const trip of filteredTrips) {
+      const normalizedDate = trip.tripDate.includes("T") ? trip.tripDate.slice(0, 10) : trip.tripDate;
+      const key = `${trip.clientId}:${normalizedDate}`;
+      const existingGroup = groups.get(key);
+
+      if (existingGroup) {
+        existingGroup.items.push(trip);
+        continue;
+      }
+
+      groups.set(key, {
+        clientId: trip.clientId,
+        clientName: trip.clientName,
+        tripDate: normalizedDate,
+        items: [trip]
+      });
+    }
+
+    return Array.from(groups.values()).map((group) => {
+      const orderedItems = [...group.items].sort((left, right) => {
+        const leftTime = new Date(left.createdAt).getTime();
+        const rightTime = new Date(right.createdAt).getTime();
+        return leftTime - rightTime;
+      });
+
+      return {
+        ...group,
+        items: orderedItems,
+        totalKilometers: orderedItems.reduce((total, trip) => total + trip.kilometers, 0),
+        pendingKilometers: orderedItems.reduce((total, trip) => (trip.status === "paid" ? total : total + trip.kilometers), 0)
+      };
+    });
+  }, [filteredTrips]);
+
   function clearTripForm() {
     setTripDate(getTodayDate());
-    setPlaceSearch("");
-    setSelectedPlace(null);
+    setFromPlaceSearch("");
+    setSelectedFromPlace(null);
+    setToPlaceSearch("");
+    setSelectedToPlace(null);
+    setActiveRouteField("from");
+    setRoutePickerOpenField(null);
     setKilometers("");
   }
 
@@ -242,8 +391,18 @@ export function CamionesHomePage() {
   }
 
   function selectPlace(place: CamionesPlace) {
-    setSelectedPlace(place);
-    setPlaceSearch(place.name);
+    if (activeRouteField === "from") {
+      setSelectedFromPlace(place);
+      setFromPlaceSearch(place.name);
+      destinationInputRef.current?.focus();
+      setActiveRouteField("to");
+      setRoutePickerOpenField(null);
+      return;
+    }
+
+    setSelectedToPlace(place);
+    setToPlaceSearch(place.name);
+    setRoutePickerOpenField(null);
     kilometersInputRef.current?.focus();
   }
 
@@ -265,8 +424,13 @@ export function CamionesHomePage() {
   }
 
   function openPlaceCreateModal() {
-    setPlaceDraftName(placeSearch.trim());
+    setPlaceDraftName((activeRouteField === "from" ? fromPlaceSearch : toPlaceSearch).trim());
     setPlaceModalState({ mode: "create", placeId: null });
+  }
+
+  function toggleRoutePicker(field: RouteField) {
+    setActiveRouteField(field);
+    setRoutePickerOpenField((current) => (current === field ? null : field));
   }
 
   function closePlaceModal() {
@@ -298,40 +462,67 @@ export function CamionesHomePage() {
 
   async function handleSaveClient() {
     const name = clientDraftName.trim();
+    const phone = clientDraftPhone.trim();
     if (!name) {
       toast.error("Escribe el nombre del cliente");
       return;
     }
 
+    const mode = clientModalState?.mode;
+    const editingClientId = clientModalState?.clientId ?? null;
+    const previousClients = clients;
+    const previousTrips = trips;
+    const previousSelectedClient = selectedClient;
+    const previousClientSearch = clientSearch;
+    const previousTab = tab;
+    const currentClient =
+      mode === "edit" && editingClientId ? previousClients.find((client) => client.id === editingClientId) ?? null : null;
+    const nextClient =
+      mode === "edit" && currentClient
+        ? { ...currentClient, name, phone: phone || null, updatedAt: new Date().toISOString() }
+        : buildOptimisticClient(getTempId(), name, phone);
+
     setSavingClient(true);
+    setClients((current) =>
+      mode === "edit" && editingClientId ? current.map((client) => (client.id === editingClientId ? nextClient : client)) : [nextClient, ...current]
+    );
+    setSelectedClient(nextClient);
+    setClientSearch(nextClient.name);
+    setClientModalState(null);
+    setClientDraftName("");
+    setClientDraftPhone("");
+    setClientDeleteConfirmOpen(false);
+    setSavingClient(false);
+    toast.success(mode === "edit" ? "Cliente actualizado" : `Cliente agregado: ${nextClient.name}`);
+
+    if (previousTab === "cliente" && mode !== "edit") {
+      clearTripForm();
+      setTab("viaje");
+    }
 
     try {
       const payload =
-        clientModalState?.mode === "edit" && clientModalState.clientId
-          ? await updateCamionesClient(clientModalState.clientId, {
+        mode === "edit" && editingClientId
+          ? await updateCamionesClient(editingClientId, {
               name,
-              phone: clientDraftPhone.trim() || undefined
+              phone: phone || undefined
             })
           : await createCamionesClientRequest({
               name,
-              phone: clientDraftPhone.trim() || undefined
+              phone: phone || undefined
             });
-
-      await refreshClients();
-      await refreshTrips();
-      setSelectedClient(payload.item);
-      setClientSearch(payload.item.name);
-      closeClientModal();
-      toast.success(clientModalState?.mode === "edit" ? "Cliente actualizado" : `Cliente agregado: ${payload.item.name}`);
-
-      if (tab === "cliente" && clientModalState?.mode !== "edit") {
-        clearTripForm();
-        setTab("viaje");
-      }
+      setClients((current) => current.map((client) => (client.id === nextClient.id ? payload.item : client)));
+      setSelectedClient((current) => (current?.id === nextClient.id ? payload.item : current));
+      setClientSearch((current) => (normalizeText(current) === normalizeText(nextClient.name) ? payload.item.name : current));
+      void refreshClients();
+      void refreshTrips();
     } catch (error) {
+      setClients(previousClients);
+      setTrips(previousTrips);
+      setSelectedClient(previousSelectedClient);
+      setClientSearch(previousClientSearch);
+      setTab(previousTab);
       toast.error(error instanceof Error ? error.message : "No se pudo guardar el cliente");
-    } finally {
-      setSavingClient(false);
     }
   }
 
@@ -356,25 +547,38 @@ export function CamionesHomePage() {
       return;
     }
 
+    const clientId = clientModalState.clientId;
+    const previousClients = clients;
+    const previousTrips = trips;
+    const previousSelectedClient = selectedClient;
+    const previousClientSearch = clientSearch;
+
     setDeletingClient(true);
+    setClients((current) => current.filter((client) => client.id !== clientId));
+    setTrips((current) => current.filter((trip) => trip.clientId !== clientId));
+
+    if (selectedClient?.id === clientId) {
+      setSelectedClient(null);
+      setClientSearch("");
+    }
+
+    setClientDeleteConfirmOpen(false);
+    setClientModalState(null);
+    setClientDraftName("");
+    setClientDraftPhone("");
+    setDeletingClient(false);
+    toast.success("Cliente eliminado");
 
     try {
-      await archiveCamionesClient(clientModalState.clientId);
-      await refreshClients();
-      await refreshTrips();
-
-      if (selectedClient?.id === clientModalState.clientId) {
-        setSelectedClient(null);
-        setClientSearch("");
-      }
-
-      setClientDeleteConfirmOpen(false);
-      closeClientModal();
-      toast.success("Cliente eliminado");
+      await archiveCamionesClient(clientId);
+      void refreshClients();
+      void refreshTrips();
     } catch (error) {
+      setClients(previousClients);
+      setTrips(previousTrips);
+      setSelectedClient(previousSelectedClient);
+      setClientSearch(previousClientSearch);
       toast.error(error instanceof Error ? error.message : "No se pudo eliminar el cliente");
-    } finally {
-      setDeletingClient(false);
     }
   }
 
@@ -385,44 +589,92 @@ export function CamionesHomePage() {
       return;
     }
 
+    const mode = placeModalState?.mode;
+    const editingPlaceId = placeModalState?.placeId ?? null;
+    const previousPlaces = places;
+    const previousSelectedFromPlace = selectedFromPlace;
+    const previousFromPlaceSearch = fromPlaceSearch;
+    const previousSelectedToPlace = selectedToPlace;
+    const previousToPlaceSearch = toPlaceSearch;
+    const currentPlace =
+      mode === "edit" && editingPlaceId ? previousPlaces.find((place) => place.id === editingPlaceId) ?? null : null;
+    const nextPlace =
+      mode === "edit" && currentPlace ? { ...currentPlace, name, updatedAt: new Date().toISOString() } : buildOptimisticPlace(getTempId(), name);
+
     setSavingPlace(true);
+    setPlaces((current) =>
+      mode === "edit" && editingPlaceId ? current.map((place) => (place.id === editingPlaceId ? nextPlace : place)) : [nextPlace, ...current]
+    );
+    if (activeRouteField === "from") {
+      setSelectedFromPlace(nextPlace);
+      setFromPlaceSearch(nextPlace.name);
+      destinationInputRef.current?.focus();
+      setActiveRouteField("to");
+      setRoutePickerOpenField("to");
+    } else {
+      setSelectedToPlace(nextPlace);
+      setToPlaceSearch(nextPlace.name);
+      setRoutePickerOpenField("to");
+    }
+    setPlaceModalState(null);
+    setPlaceDraftName("");
+    setSavingPlace(false);
+    toast.success(mode === "edit" ? "Lugar actualizado" : `Lugar agregado: ${nextPlace.name}`);
+    kilometersInputRef.current?.focus();
 
     try {
       const payload =
-        placeModalState?.mode === "edit" && placeModalState.placeId
-          ? await updateCamionesPlace(placeModalState.placeId, { name })
+        mode === "edit" && editingPlaceId
+          ? await updateCamionesPlace(editingPlaceId, { name })
           : await createCamionesPlaceRequest({ name });
-
-      await refreshPlaces();
-      setSelectedPlace(payload.item);
-      setPlaceSearch(payload.item.name);
-      closePlaceModal();
-      toast.success(placeModalState?.mode === "edit" ? "Lugar actualizado" : `Lugar agregado: ${payload.item.name}`);
-      kilometersInputRef.current?.focus();
+      setPlaces((current) => current.map((place) => (place.id === nextPlace.id ? payload.item : place)));
+      setSelectedFromPlace((current) => (current?.id === nextPlace.id ? payload.item : current));
+      setSelectedToPlace((current) => (current?.id === nextPlace.id ? payload.item : current));
+      setFromPlaceSearch((current) => (normalizeText(current) === normalizeText(nextPlace.name) ? payload.item.name : current));
+      setToPlaceSearch((current) => (normalizeText(current) === normalizeText(nextPlace.name) ? payload.item.name : current));
+      void refreshPlaces();
     } catch (error) {
+      setPlaces(previousPlaces);
+      setSelectedFromPlace(previousSelectedFromPlace);
+      setFromPlaceSearch(previousFromPlaceSearch);
+      setSelectedToPlace(previousSelectedToPlace);
+      setToPlaceSearch(previousToPlaceSearch);
       toast.error(error instanceof Error ? error.message : "No se pudo guardar el lugar");
-    } finally {
-      setSavingPlace(false);
     }
   }
 
   async function handleArchivePlace(place: CamionesPlace) {
+    const previousPlaces = places;
+    const previousSelectedFromPlace = selectedFromPlace;
+    const previousFromPlaceSearch = fromPlaceSearch;
+    const previousSelectedToPlace = selectedToPlace;
+    const previousToPlaceSearch = toPlaceSearch;
     setArchivingPlaceId(place.id);
+    setPlaces((current) => current.filter((item) => item.id !== place.id));
+
+    if (selectedFromPlace?.id === place.id) {
+      setSelectedFromPlace(null);
+      setFromPlaceSearch("");
+    }
+
+    if (selectedToPlace?.id === place.id) {
+      setSelectedToPlace(null);
+      setToPlaceSearch("");
+    }
+
+    setArchivingPlaceId(null);
+    toast.success(`Lugar archivado: ${place.name}`);
 
     try {
       await archiveCamionesPlace(place.id);
-      await refreshPlaces();
-
-      if (selectedPlace?.id === place.id) {
-        setSelectedPlace(null);
-        setPlaceSearch("");
-      }
-
-      toast.success(`Lugar archivado: ${place.name}`);
+      void refreshPlaces();
     } catch (error) {
+      setPlaces(previousPlaces);
+      setSelectedFromPlace(previousSelectedFromPlace);
+      setFromPlaceSearch(previousFromPlaceSearch);
+      setSelectedToPlace(previousSelectedToPlace);
+      setToPlaceSearch(previousToPlaceSearch);
       toast.error(error instanceof Error ? error.message : "No se pudo archivar el lugar");
-    } finally {
-      setArchivingPlaceId(null);
     }
   }
 
@@ -475,8 +727,13 @@ export function CamionesHomePage() {
       return;
     }
 
-    if (!selectedPlace) {
-      toast.error("Falta el lugar");
+    if (!selectedFromPlace) {
+      toast.error("Falta el origen");
+      return;
+    }
+
+    if (!selectedToPlace) {
+      toast.error("Falta el destino");
       return;
     }
 
@@ -485,27 +742,52 @@ export function CamionesHomePage() {
       return;
     }
 
+    const previousTrips = trips;
+    const previousClientSearch = clientSearch;
+    const previousSelectedClient = selectedClient;
+    const previousTripDate = tripDate;
+    const previousFromPlaceSearch = fromPlaceSearch;
+    const previousSelectedFromPlace = selectedFromPlace;
+    const previousToPlaceSearch = toPlaceSearch;
+    const previousSelectedToPlace = selectedToPlace;
+    const previousKilometers = kilometers;
+    const previousTab = tab;
+    const optimisticTrip = buildOptimisticTrip(selectedClient, selectedFromPlace, selectedToPlace, tripDate, kmValue);
+
     setSavingTrip(true);
+    setTrips((current) => [optimisticTrip, ...current]);
+    toast.success(`Viaje guardado para ${selectedClient.name}`);
+    setFromPlaceSearch("");
+    setSelectedFromPlace(null);
+    setToPlaceSearch("");
+    setSelectedToPlace(null);
+    setActiveRouteField("from");
+    setKilometers("");
+    setSavingTrip(false);
+    placeInputRef.current?.focus();
 
     try {
-      await createCamionesTrip({
+      const payload = await createCamionesTrip({
         clientId: selectedClient.id,
-        placeId: selectedPlace.id,
+        placeId: selectedToPlace.id,
         tripDate,
-        kilometers: Number(kmValue.toFixed(2))
+        kilometers: Number(kmValue.toFixed(2)),
+        notes: buildRouteNotes(selectedFromPlace.name)
       });
-      await refreshTrips();
-      toast.success(`Viaje guardado para ${selectedClient.name}`);
-      setClientSearch("");
-      setSelectedClient(null);
-      clearTripForm();
-      setTripFilter("pending");
-      setTripSearch("");
-      setTab("registro");
+      setTrips((current) => current.map((trip) => (trip.id === optimisticTrip.id ? payload.trip : trip)));
+      void refreshTrips();
     } catch (error) {
+      setTrips(previousTrips);
+      setClientSearch(previousClientSearch);
+      setSelectedClient(previousSelectedClient);
+      setTripDate(previousTripDate);
+      setFromPlaceSearch(previousFromPlaceSearch);
+      setSelectedFromPlace(previousSelectedFromPlace);
+      setToPlaceSearch(previousToPlaceSearch);
+      setSelectedToPlace(previousSelectedToPlace);
+      setKilometers(previousKilometers);
+      setTab(previousTab);
       toast.error(error instanceof Error ? error.message : "No se pudo guardar el viaje");
-    } finally {
-      setSavingTrip(false);
     }
   }
 
@@ -554,7 +836,28 @@ export function CamionesHomePage() {
       return;
     }
 
+    const previousTrips = trips;
     setSavingTripEdit(true);
+    setTrips((current) =>
+      current.map((trip) =>
+        trip.id === tripId
+          ? {
+              ...trip,
+              tripDate: tripDateValue,
+              placeId: matchedPlace.id,
+              place: matchedPlace.name,
+              kilometers: Number(kilometersValue.toFixed(2)),
+              updatedAt: new Date().toISOString()
+            }
+          : trip
+      )
+    );
+    setTripModalState(null);
+    setTripDraftDate("");
+    setTripDraftPlace("");
+    setTripDraftKilometers("");
+    setSavingTripEdit(false);
+    toast.success("Registro actualizado");
 
     try {
       await updateCamionesTrip(tripId, {
@@ -562,13 +865,10 @@ export function CamionesHomePage() {
         tripDate: tripDateValue,
         kilometers: Number(kilometersValue.toFixed(2))
       });
-      await refreshTrips();
-      closeTripModal();
-      toast.success("Registro actualizado");
+      void refreshTrips();
     } catch (error) {
+      setTrips(previousTrips);
       toast.error(error instanceof Error ? error.message : "No se pudo actualizar el registro");
-    } finally {
-      setSavingTripEdit(false);
     }
   }
 
@@ -706,48 +1006,140 @@ export function CamionesHomePage() {
                 <input type="date" value={tripDate} onChange={(event) => setTripDate(event.target.value)} style={inputStyle} />
               </label>
 
-              <label style={fieldWrapStyle}>
-                <span style={fieldLabelStyle}>Lugar</span>
-                <div style={searchWrapStyle}>
-                  <input
-                    ref={placeInputRef}
-                    type="text"
-                    value={placeSearch}
-                    onChange={(event) => {
-                      setPlaceSearch(event.target.value);
-                      setSelectedPlace(null);
-                    }}
-                    placeholder="Ej: Piedra Sola"
-                    style={inputStyle}
-                  />
-                  <button type="button" onClick={openPlaceCreateModal} style={plusButtonStyle} aria-label="Agregar lugar">
-                    +
-                  </button>
-                </div>
-              </label>
+              <div style={routeInputsWrapStyle}>
+                <label style={fieldWrapStyle}>
+                  <span style={fieldLabelStyle}>Desde</span>
+                  <div style={routeFieldWrapStyle}>
+                    <div style={routeFieldRowStyle}>
+                      <input
+                        ref={placeInputRef}
+                        type="text"
+                        value={fromPlaceSearch}
+                        readOnly
+                        onClick={() => toggleRoutePicker("from")}
+                        placeholder="Elegir origen"
+                        style={readOnlyRouteInputStyle}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => toggleRoutePicker("from")}
+                        style={routeToggleButtonStyle}
+                        aria-label="Mostrar localidades para origen"
+                      >
+                        {routePickerOpenField === "from" ? "▴" : "▾"}
+                      </button>
+                    </div>
 
-              <div style={{ display: "grid", gap: 8 }}>
-                {placesLoading ? <div style={emptyBoxStyle}>Cargando lugares...</div> : null}
-                {filteredPlaces.map((place) => (
-                  <div key={place.id} style={entityWrapStyle}>
-                    <button
-                      type="button"
-                      onClick={() => selectPlace(place)}
-                      style={
-                        selectedPlace?.id === place.id || normalizeText(placeSearch) === normalizeText(place.name)
-                          ? selectedButtonStyle
-                          : pickerButtonStyle
-                      }
-                    >
-                      <span style={placeCellContentStyle}>
-                        <span style={placeCellTextStyle}>{place.name}</span>
-                      </span>
-                    </button>
+                    {routePickerOpenField === "from" ? (
+                      <div style={routeDropdownStyle}>
+                        <input
+                          type="text"
+                          value={fromPlaceSearch}
+                          onChange={(event) => {
+                            setActiveRouteField("from");
+                            setRoutePickerOpenField("from");
+                            setFromPlaceSearch(event.target.value);
+                            setSelectedFromPlace(null);
+                          }}
+                          placeholder="Buscar origen"
+                          style={routeSearchInputStyle}
+                        />
+
+                        <div style={routeDropdownListStyle}>
+                          {placesLoading ? <div style={dropdownEmptyStyle}>Cargando lugares...</div> : null}
+                          {filteredPlaces.map((place) => (
+                            <button
+                              key={place.id}
+                              type="button"
+                              onClick={() => selectPlace(place)}
+                              style={
+                                selectedFromPlace?.id === place.id || normalizeText(fromPlaceSearch) === normalizeText(place.name)
+                                  ? selectedDropdownOptionStyle
+                                  : dropdownOptionStyle
+                              }
+                            >
+                              {place.name}
+                            </button>
+                          ))}
+                          {!placesLoading && filteredPlaces.length === 0 ? (
+                            <div style={dropdownEmptyStyle}>No hay localidades para esa busqueda.</div>
+                          ) : null}
+                        </div>
+
+                        <button type="button" onClick={openPlaceCreateModal} style={dropdownAddButtonStyle}>
+                          Agregar localidad
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
-                ))}
-                {!placesLoading && filteredPlaces.length === 0 ? (
-                  <div style={emptyBoxStyle}>No hay lugares para esa busqueda.</div>
-                ) : null}
+                </label>
+
+                <label style={fieldWrapStyle}>
+                  <span style={fieldLabelStyle}>Hasta</span>
+                  <div style={routeFieldWrapStyle}>
+                    <div style={routeFieldRowStyle}>
+                      <input
+                        ref={destinationInputRef}
+                        type="text"
+                        value={toPlaceSearch}
+                        readOnly
+                        onClick={() => toggleRoutePicker("to")}
+                        placeholder="Elegir destino"
+                        style={readOnlyRouteInputStyle}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => toggleRoutePicker("to")}
+                        style={routeToggleButtonStyle}
+                        aria-label="Mostrar localidades para destino"
+                      >
+                        {routePickerOpenField === "to" ? "▴" : "▾"}
+                      </button>
+                    </div>
+
+                    {routePickerOpenField === "to" ? (
+                      <div style={routeDropdownStyle}>
+                        <input
+                          type="text"
+                          value={toPlaceSearch}
+                          onChange={(event) => {
+                            setActiveRouteField("to");
+                            setRoutePickerOpenField("to");
+                            setToPlaceSearch(event.target.value);
+                            setSelectedToPlace(null);
+                          }}
+                          placeholder="Buscar destino"
+                          style={routeSearchInputStyle}
+                        />
+
+                        <div style={routeDropdownListStyle}>
+                          {placesLoading ? <div style={dropdownEmptyStyle}>Cargando lugares...</div> : null}
+                          {filteredPlaces.map((place) => (
+                            <button
+                              key={place.id}
+                              type="button"
+                              onClick={() => selectPlace(place)}
+                              style={
+                                selectedToPlace?.id === place.id || normalizeText(toPlaceSearch) === normalizeText(place.name)
+                                  ? selectedDropdownOptionStyle
+                                  : dropdownOptionStyle
+                              }
+                            >
+                              {place.name}
+                            </button>
+                          ))}
+                          {!placesLoading && filteredPlaces.length === 0 ? (
+                            <div style={dropdownEmptyStyle}>No hay localidades para esa busqueda.</div>
+                          ) : null}
+                        </div>
+
+                        <button type="button" onClick={openPlaceCreateModal} style={dropdownAddButtonStyle}>
+                          Agregar localidad
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                </label>
               </div>
 
               <label style={fieldWrapStyle}>
@@ -765,9 +1157,14 @@ export function CamionesHomePage() {
                 />
               </label>
 
-              <button type="button" onClick={() => void handleSaveTrip()} style={saveButtonStyle} disabled={savingTrip}>
-                {savingTrip ? "Guardando..." : "Registrar viaje"}
-              </button>
+              <div style={tripActionRowStyle}>
+                <button type="button" onClick={() => setTab("registro")} style={secondaryActionButtonStyle}>
+                  Ver registro
+                </button>
+                <button type="button" onClick={() => void handleSaveTrip()} style={saveButtonStyle} disabled={savingTrip}>
+                  {savingTrip ? "Guardando..." : "Guardar y seguir"}
+                </button>
+              </div>
             </div>
           </section>
         ) : null}
@@ -788,7 +1185,7 @@ export function CamionesHomePage() {
                   type="text"
                   value={tripSearch}
                   onChange={(event) => setTripSearch(event.target.value)}
-                  placeholder="Cliente o lugar"
+                  placeholder="Cliente o recorrido"
                   style={inputStyle}
                 />
               </label>
@@ -810,35 +1207,72 @@ export function CamionesHomePage() {
               </div>
 
               {tripsLoading ? <div style={emptyBoxStyle}>Cargando registro...</div> : null}
-              {!tripsLoading && filteredTrips.length === 0 ? <div style={emptyBoxStyle}>Todavia no hay viajes registrados.</div> : null}
-              {filteredTrips.map((trip) => (
-                <article key={trip.id} style={trip.status === "paid" ? historyCardStyle : tripCardStyle}>
-                  <div style={tripCardTopRowStyle}>
-                    <div style={{ display: "grid", gap: 4 }}>
-                      <strong style={{ fontSize: 19, color: "#2f241e" }}>{trip.clientName}</strong>
-                      <span style={tripMetaStyle}>
-                        {formatDateLabel(trip.tripDate)} - {trip.place}
+              {!tripsLoading && groupedTrips.length === 0 ? <div style={emptyBoxStyle}>Todavia no hay viajes registrados.</div> : null}
+              {groupedTrips.map((group) => {
+                const isGroupFullyPaid = group.items.every((trip) => trip.status === "paid");
+
+                return (
+                  <article key={`${group.clientId}-${group.tripDate}`} style={isGroupFullyPaid ? historyCardStyle : tripCardStyle}>
+                    <div style={tripCardTopRowStyle}>
+                      <div style={{ display: "grid", gap: 6 }}>
+                        <strong style={{ fontSize: 19, color: "#2f241e" }}>{group.clientName}</strong>
+                        <span style={tripMetaStyle}>{formatDateLabel(group.tripDate)}</span>
+                      </div>
+                      <span style={tripCountBadgeStyle}>
+                        {group.items.length} viaje{group.items.length > 1 ? "s" : ""}
                       </span>
-                      <span style={tripKmStyle}>{trip.kilometers} km</span>
                     </div>
-                    <button type="button" onClick={() => openTripEditModal(trip)} style={miniActionButtonStyle}>
-                      Editar
-                    </button>
-                  </div>
-                  {trip.status === "paid" ? (
-                    <span style={paidPillStyle}>Pago</span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => void handleMarkPaid(trip.id, trip.clientName)}
-                      style={pendingPillButtonStyle}
-                      disabled={markingPaidId === trip.id}
-                    >
-                      {markingPaidId === trip.id ? "Guardando..." : "Pendiente"}
-                    </button>
-                  )}
-                </article>
-              ))}
+
+                    <div style={tripStackStyle}>
+                      {[...group.items]
+                        .map((trip, index) => ({ trip, sequence: index + 1 }))
+                        .reverse()
+                        .map(({ trip, sequence }) => {
+                        const route = getTripRouteParts(trip);
+
+                        return (
+                          <div key={trip.id} style={tripRouteItemStyle}>
+                            <div style={tripRouteCellStyle}>
+                              <div style={tripInlineRowStyle}>
+                                <span style={tripInlineIndexStyle}>V{sequence}</span>
+                                <div style={tripInlineRouteStyle}>
+                                  <span style={tripInlinePlaceStyle}>{route.from}</span>
+                                  <span style={tripRouteArrowStyle}>→</span>
+                                  <span style={tripInlinePlaceStyle}>{route.to}</span>
+                                </div>
+                                <span style={tripMiniKmStyle}>{trip.kilometers} km</span>
+                              </div>
+
+                              <div style={tripRouteItemFooterStyle}>
+                                <button type="button" onClick={() => openTripEditModal(trip)} style={miniActionButtonStyle}>
+                                  Editar
+                                </button>
+                                {trip.status === "paid" ? (
+                                  <span style={paidPillStyle}>Pago</span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleMarkPaid(trip.id, trip.clientName)}
+                                    style={pendingPillButtonStyle}
+                                    disabled={markingPaidId === trip.id}
+                                  >
+                                    {markingPaidId === trip.id ? "Guardando..." : "Pendiente"}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div style={tripCardFooterStyle}>
+                      <span style={tripTotalLabelStyle}>Total pendiente</span>
+                      <span style={tripKmStyle}>{group.pendingKilometers.toFixed(0)} km</span>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           </section>
         ) : null}
@@ -1121,6 +1555,121 @@ const searchWrapStyle: React.CSSProperties = {
   alignItems: "center"
 };
 
+const routeInputsWrapStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 12
+};
+
+const routeFieldWrapStyle: React.CSSProperties = {
+  position: "relative",
+  display: "grid",
+  gap: 8
+};
+
+const routeFieldRowStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr auto",
+  gap: 8,
+  alignItems: "center"
+};
+
+const routeToggleButtonStyle: React.CSSProperties = {
+  width: 54,
+  height: 54,
+  borderRadius: 18,
+  border: "1px solid #d8ccbf",
+  background: "#fff6e9",
+  color: "#5f4a3d",
+  fontSize: 24,
+  fontWeight: 800,
+  boxShadow: "0 10px 18px rgba(73, 48, 34, 0.08)",
+  cursor: "pointer"
+};
+
+const routeDropdownStyle: React.CSSProperties = {
+  position: "absolute",
+  top: "calc(100% + 6px)",
+  left: 0,
+  right: 0,
+  zIndex: 20,
+  display: "grid",
+  gap: 10,
+  padding: 10,
+  borderRadius: 18,
+  border: "1px solid #e5d7c6",
+  background: "#fffdf9",
+  boxShadow: "0 18px 34px rgba(73, 48, 34, 0.14)"
+};
+
+const routeSearchInputStyle: React.CSSProperties = {
+  width: "100%",
+  minHeight: 46,
+  padding: "10px 14px",
+  borderRadius: 18,
+  border: "1px solid #d8ccbf",
+  background: "#fffaf4",
+  color: "#3f3128",
+  fontSize: 14,
+  boxSizing: "border-box"
+};
+
+const routeDropdownListStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 6,
+  maxHeight: 220,
+  overflowY: "auto"
+};
+
+const dropdownOptionStyle: React.CSSProperties = {
+  width: "100%",
+  minHeight: 44,
+  padding: "10px 12px",
+  borderRadius: 14,
+  border: "1px solid #eadfce",
+  background: "#fcf8f2",
+  color: "#2f241e",
+  textAlign: "left",
+  fontSize: 15,
+  fontWeight: 700,
+  cursor: "pointer"
+};
+
+const selectedDropdownOptionStyle: React.CSSProperties = {
+  ...dropdownOptionStyle,
+  border: "1px solid #c98532",
+  background: "#fff0dc"
+};
+
+const dropdownEmptyStyle: React.CSSProperties = {
+  minHeight: 44,
+  padding: "10px 12px",
+  borderRadius: 14,
+  background: "#f8f1e7",
+  color: "#6c5848",
+  display: "flex",
+  alignItems: "center",
+  fontSize: 14
+};
+
+const dropdownAddButtonStyle: React.CSSProperties = {
+  minHeight: 46,
+  padding: "10px 14px",
+  borderRadius: 16,
+  border: "1px solid rgba(95, 63, 8, 0.2)",
+  background: "#c98532",
+  color: "#fffaf4",
+  fontWeight: 800,
+  fontSize: 15,
+  cursor: "pointer"
+};
+
+const tripActionRowStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1.4fr)",
+  gap: 10,
+  alignItems: "center"
+};
+
 const inputStyle: React.CSSProperties = {
   width: "100%",
   minHeight: 54,
@@ -1130,6 +1679,14 @@ const inputStyle: React.CSSProperties = {
   background: "#fffaf4",
   fontSize: 17,
   boxSizing: "border-box"
+};
+
+const readOnlyRouteInputStyle: React.CSSProperties = {
+  ...inputStyle,
+  cursor: "pointer",
+  background: "#fff8f0",
+  color: "#3f3128",
+  fontWeight: 600
 };
 
 const plusButtonStyle: React.CSSProperties = {
@@ -1202,18 +1759,6 @@ const clientCellStatusWrapStyle: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "center"
-};
-
-const placeCellContentStyle: React.CSSProperties = {
-  position: "relative",
-  display: "block",
-  width: "100%"
-};
-
-const placeCellTextStyle: React.CSSProperties = {
-  display: "block",
-  paddingRight: 24,
-  maxWidth: "calc(100% - 120px)"
 };
 
 const clientPhoneStyle: React.CSSProperties = {
@@ -1334,9 +1879,97 @@ const historyCardStyle: React.CSSProperties = {
   border: "1px solid #cfe1d1"
 };
 
+const tripCountBadgeStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "8px 12px",
+  borderRadius: 999,
+  background: "#efe2d0",
+  color: "#6a5443",
+  fontSize: 13,
+  fontWeight: 800
+};
+
 const tripMetaStyle: React.CSSProperties = {
   color: "#6d5b4f",
   fontSize: 14
+};
+
+const tripStackStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 8
+};
+
+const tripRouteItemStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 8,
+  padding: 0
+};
+
+const tripRouteCellStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 10,
+  padding: 12,
+  borderRadius: 18,
+  background: "rgba(255, 255, 255, 0.52)",
+  border: "1px solid rgba(224, 211, 196, 0.92)"
+};
+
+const tripInlineRowStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "auto minmax(0, 1fr) auto",
+  gap: 10,
+  alignItems: "center",
+  minWidth: 0
+};
+
+const tripInlineIndexStyle: React.CSSProperties = {
+  fontSize: 12,
+  fontWeight: 800,
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
+  color: "#8a745d",
+  whiteSpace: "nowrap"
+};
+
+const tripInlineRouteStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  minWidth: 0,
+  overflow: "hidden"
+};
+
+const tripInlinePlaceStyle: React.CSSProperties = {
+  fontSize: 16,
+  fontWeight: 700,
+  color: "#2f241e",
+  lineHeight: 1.2,
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap"
+};
+
+const tripRouteArrowStyle: React.CSSProperties = {
+  fontSize: 18,
+  fontWeight: 900,
+  color: "#b67828",
+  flex: "0 0 auto"
+};
+
+const tripRouteItemFooterStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 12,
+  flexWrap: "wrap"
+};
+
+const tripMiniKmStyle: React.CSSProperties = {
+  color: "#2f241e",
+  fontSize: 16,
+  fontWeight: 800
 };
 
 const tripKmStyle: React.CSSProperties = {
@@ -1345,9 +1978,24 @@ const tripKmStyle: React.CSSProperties = {
   fontWeight: 800
 };
 
+const tripCardFooterStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 12,
+  flexWrap: "wrap"
+};
+
+const tripTotalLabelStyle: React.CSSProperties = {
+  fontSize: 13,
+  fontWeight: 800,
+  textTransform: "uppercase",
+  letterSpacing: "0.08em",
+  color: "#8a745d"
+};
+
 const paidPillStyle: React.CSSProperties = {
   display: "inline-flex",
-  alignSelf: "flex-start",
   padding: "10px 14px",
   borderRadius: 999,
   background: "#dcefe2",
@@ -1359,7 +2007,6 @@ const pendingPillButtonStyle: React.CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
-  alignSelf: "flex-start",
   padding: "10px 14px",
   borderRadius: 999,
   border: "1px solid rgba(145, 102, 0, 0.18)",
