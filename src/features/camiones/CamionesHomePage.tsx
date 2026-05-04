@@ -75,6 +75,7 @@ function getTripRouteParts(trip: CamionesTrip) {
 export function CamionesHomePage() {
   const CLIENTS_PAGE_SIZE = 3;
   const GROUP_TRIPS_PAGE_SIZE = 3;
+  const PAID_GROUPS_PAGE_SIZE = 3;
   const clientInputRef = useRef<HTMLInputElement | null>(null);
   const placeInputRef = useRef<HTMLInputElement | null>(null);
   const destinationInputRef = useRef<HTMLInputElement | null>(null);
@@ -121,6 +122,7 @@ export function CamionesHomePage() {
   const [tripDraftKilometers, setTripDraftKilometers] = useState("");
   const [hiddenTripGroups, setHiddenTripGroups] = useState<string[]>([]);
   const [visibleTripsByGroup, setVisibleTripsByGroup] = useState<Record<string, number>>({});
+  const [visiblePaidGroupCount, setVisiblePaidGroupCount] = useState(0);
 
   function getTempId() {
     const nextId = tempIdRef.current;
@@ -376,6 +378,33 @@ export function CamionesHomePage() {
       };
     }).filter((group) => !hiddenTripGroups.includes(group.groupKey));
   }, [filteredTrips, hiddenTripGroups]);
+
+  const visibleGroupedTrips = useMemo(() => {
+    if (tripFilter !== "all") {
+      return groupedTrips;
+    }
+
+    const pendingGroups = groupedTrips.filter((group) => group.items.some((trip) => trip.status !== "paid"));
+    const paidGroups = groupedTrips.filter((group) => group.items.every((trip) => trip.status === "paid"));
+
+    return [...pendingGroups, ...paidGroups.slice(0, visiblePaidGroupCount)];
+  }, [groupedTrips, tripFilter, visiblePaidGroupCount]);
+
+  const hiddenPaidGroupsCount = useMemo(() => {
+    if (tripFilter !== "all") {
+      return 0;
+    }
+
+    return groupedTrips.filter((group) => group.items.every((trip) => trip.status === "paid")).length - visiblePaidGroupCount;
+  }, [groupedTrips, tripFilter, visiblePaidGroupCount]);
+
+  useEffect(() => {
+    if (tripFilter !== "all") {
+      return;
+    }
+
+    setVisiblePaidGroupCount(0);
+  }, [tripFilter, tripSearch]);
 
   function clearTripForm() {
     setTripDate(getTodayDate());
@@ -1017,15 +1046,6 @@ export function CamionesHomePage() {
             </div>
 
             <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
-              <button type="button" onClick={() => setTab("cliente")} style={changeClientButtonStyle}>
-                Cambiar cliente
-              </button>
-
-              <label style={fieldWrapStyle}>
-                <span style={fieldLabelStyle}>Fecha</span>
-                <input type="date" value={tripDate} onChange={(event) => setTripDate(event.target.value)} style={inputStyle} />
-              </label>
-
               <div style={routeInputsWrapStyle}>
                 <label style={fieldWrapStyle}>
                   <span style={fieldLabelStyle}>Desde</span>
@@ -1147,6 +1167,15 @@ export function CamionesHomePage() {
                 />
               </label>
 
+              <label style={fieldWrapStyle}>
+                <span style={fieldLabelStyle}>Fecha</span>
+                <input type="date" value={tripDate} onChange={(event) => setTripDate(event.target.value)} style={inputStyle} />
+              </label>
+
+              <button type="button" onClick={() => setTab("cliente")} style={changeClientButtonStyle}>
+                Cambiar cliente
+              </button>
+
               <div style={tripActionRowStyle}>
                 <button type="button" onClick={() => setTab("registro")} style={secondaryActionButtonStyle}>
                   Ver registro
@@ -1197,8 +1226,8 @@ export function CamionesHomePage() {
               </div>
 
               {tripsLoading ? <div style={emptyBoxStyle}>Cargando registro...</div> : null}
-              {!tripsLoading && groupedTrips.length === 0 ? <div style={emptyBoxStyle}>Todavia no hay viajes registrados.</div> : null}
-              {groupedTrips.map((group) => {
+              {!tripsLoading && visibleGroupedTrips.length === 0 ? <div style={emptyBoxStyle}>Todavia no hay viajes registrados.</div> : null}
+              {visibleGroupedTrips.map((group) => {
                 const isGroupFullyPaid = group.items.every((trip) => trip.status === "paid");
                 const visibleTripsCount = visibleTripsByGroup[group.groupKey] ?? GROUP_TRIPS_PAGE_SIZE;
                 const visibleTrips = [...group.items]
@@ -1294,6 +1323,16 @@ export function CamionesHomePage() {
                   </article>
                 );
               })}
+
+              {!tripsLoading && hiddenPaidGroupsCount > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setVisiblePaidGroupCount((current) => current + PAID_GROUPS_PAGE_SIZE)}
+                  style={secondaryActionButtonStyle}
+                >
+                  Ver mas registros pagos
+                </button>
+              ) : null}
             </div>
           </section>
         ) : null}
@@ -1831,11 +1870,16 @@ const secondaryActionButtonStyle: React.CSSProperties = {
 };
 
 const changeClientButtonStyle: React.CSSProperties = {
-  ...secondaryActionButtonStyle,
-  border: "1px solid #caa06a",
-  background: "#fff1dd",
-  color: "#4f3828",
-  boxShadow: "0 12px 22px rgba(201, 133, 50, 0.14)"
+  minHeight: 40,
+  padding: "6px 4px",
+  border: "none",
+  background: "transparent",
+  color: "#8a745d",
+  fontWeight: 700,
+  fontSize: 14,
+  textAlign: "left",
+  justifySelf: "start",
+  cursor: "pointer"
 };
 
 const addPlaceRowButtonStyle: React.CSSProperties = {
