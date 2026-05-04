@@ -1,3 +1,4 @@
+import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { defineConfig } from "vite";
@@ -5,8 +6,22 @@ import react from "@vitejs/plugin-react";
 
 const packageJson = JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf8")) as { version?: string };
 const frontendVersion = packageJson.version || "0.1.0";
-const frontendReleaseSha = process.env.VITE_RELEASE_SHA || process.env.RELEASE_SHA || "local";
-const frontendReleaseCreatedAt = process.env.VITE_RELEASE_CREATED_AT || process.env.RELEASE_CREATED_AT || null;
+
+function resolveGitShortSha() {
+  try {
+    return execSync("git rev-parse --short HEAD", {
+      cwd: __dirname,
+      stdio: ["ignore", "pipe", "ignore"]
+    })
+      .toString()
+      .trim();
+  } catch {
+    return "local";
+  }
+}
+
+const frontendReleaseSha = process.env.VITE_RELEASE_SHA || process.env.RELEASE_SHA || resolveGitShortSha();
+const frontendReleaseCreatedAt = process.env.VITE_RELEASE_CREATED_AT || process.env.RELEASE_CREATED_AT || new Date().toISOString();
 
 export default defineConfig(({ mode }) => {
   const isGithubPagesBuild = mode === "github-pages";
