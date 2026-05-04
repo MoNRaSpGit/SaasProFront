@@ -82,7 +82,7 @@ export function CamionesHomePage() {
   const [places, setPlaces] = useState<CamionesPlace[]>([]);
   const [trips, setTrips] = useState<CamionesTrip[]>([]);
   const [clientSearch, setClientSearch] = useState("");
-  const [clientListExpanded, setClientListExpanded] = useState(true);
+  const [clientListExpanded, setClientListExpanded] = useState(false);
   const [visibleClientCount, setVisibleClientCount] = useState(CLIENTS_PAGE_SIZE);
   const [selectedClient, setSelectedClient] = useState<CamionesClient | null>(null);
   const [tripDate, setTripDate] = useState(getTodayDate());
@@ -322,18 +322,6 @@ export function CamionesHomePage() {
 
     return () => window.removeEventListener("scroll", handleScroll);
   }, [showTopChrome, tab]);
-
-  const clientPendingTripMap = useMemo(() => {
-    const pendingByClientId = new Map<number, boolean>();
-
-    for (const trip of trips) {
-      if (trip.status === "pending") {
-        pendingByClientId.set(trip.clientId, true);
-      }
-    }
-
-    return pendingByClientId;
-  }, [trips]);
 
   const filteredClients = useMemo(() => {
     const query = normalizeText(clientSearch);
@@ -848,6 +836,8 @@ export function CamionesHomePage() {
     setSelectedToPlace(null);
     setActiveRouteField("from");
     setKilometers("");
+    setTripFilter("all");
+    setTab("registro");
     setSavingTrip(false);
     placeInputRef.current?.focus();
 
@@ -1028,11 +1018,11 @@ export function CamionesHomePage() {
                   <button
                     type="button"
                     onClick={() => setClientListExpanded((current) => !current)}
-                    style={clientListToggleButtonStyle}
+                    style={routeToggleButtonStyle}
                     aria-label={clientListExpanded ? "Ocultar lista de clientes" : "Mostrar lista de clientes"}
                     aria-expanded={clientListExpanded}
                   >
-                    {clientListExpanded ? "▴" : "▾"}
+                    {clientListExpanded ? "▲" : "▼"}
                   </button>
                   <button type="button" onClick={openClientCreateModal} style={plusButtonStyle} aria-label="Agregar cliente">
                     +
@@ -1054,17 +1044,6 @@ export function CamionesHomePage() {
                         <span style={clientCellTextStyle}>
                           <span>{client.name}</span>
                           <span style={clientPhoneStyle}>{client.phone || "Sin telefono"}</span>
-                        </span>
-                        <span style={clientCellStatusWrapStyle}>
-                          {clientPendingTripMap.get(client.id) ? (
-                            <span style={clientPendingStatusStyle} aria-label="Cliente con pendiente">
-                              {"\u2715"}
-                            </span>
-                          ) : (
-                            <span style={clientOkStatusStyle} aria-label="Cliente sin pendientes">
-                              {"\u2713"}
-                            </span>
-                          )}
                         </span>
                       </span>
                     </button>
@@ -1664,19 +1643,6 @@ const searchWrapStyle: React.CSSProperties = {
   alignItems: "center"
 };
 
-const clientListToggleButtonStyle: React.CSSProperties = {
-  width: 54,
-  height: 54,
-  borderRadius: 18,
-  border: "1px solid #d8ccbf",
-  background: "#fff6e9",
-  color: "#5f4a3d",
-  fontSize: 24,
-  fontWeight: 800,
-  boxShadow: "0 10px 18px rgba(73, 48, 34, 0.08)",
-  cursor: "pointer"
-};
-
 const routeInputsWrapStyle: React.CSSProperties = {
   display: "grid",
   gap: 12
@@ -1866,53 +1832,13 @@ const clientCellContentStyle: React.CSSProperties = {
 
 const clientCellTextStyle: React.CSSProperties = {
   display: "grid",
-  gap: 4,
-  paddingRight: 64,
-  maxWidth: "calc(100% - 72px)"
-};
-
-const clientCellStatusWrapStyle: React.CSSProperties = {
-  position: "absolute",
-  right: 0,
-  top: "50%",
-  transform: "translateY(-50%)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center"
+  gap: 4
 };
 
 const clientPhoneStyle: React.CSSProperties = {
   fontSize: 13,
   color: "#7a6a5d",
   fontWeight: 500
-};
-
-const clientPendingStatusStyle: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  minWidth: 28,
-  minHeight: 28,
-  borderRadius: 999,
-  background: "#f5e2a8",
-  color: "#8a6300",
-  fontSize: 18,
-  fontWeight: 900,
-  boxShadow: "0 8px 16px rgba(188, 146, 43, 0.18)"
-};
-
-const clientOkStatusStyle: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  minWidth: 28,
-  minHeight: 28,
-  borderRadius: 999,
-  background: "#dcefe2",
-  color: "#24513a",
-  fontSize: 18,
-  fontWeight: 900,
-  boxShadow: "0 8px 16px rgba(36, 81, 58, 0.12)"
 };
 
 const miniActionButtonStyle: React.CSSProperties = {
@@ -2243,3 +2169,4 @@ const modalDangerButtonStyle: React.CSSProperties = {
   boxShadow: "0 12px 24px rgba(199, 77, 61, 0.18)",
   cursor: "pointer"
 };
+
