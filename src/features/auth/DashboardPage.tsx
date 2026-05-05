@@ -16,28 +16,12 @@ type ModuleCardDefinition = {
 
 const MODULE_CARDS: ModuleCardDefinition[] = [
   {
-    key: "pos",
-    title: "POS",
-    description: "Caja, ventas y control rapido.",
-    route: "/pos",
-    accent: "#0f766e",
-    surface: "linear-gradient(180deg, #ecfeff 0%, #cffafe 100%)"
-  },
-  {
     key: "camiones",
     title: "Camiones",
     description: "Clientes, lugares y viajes.",
     route: "/camiones",
     accent: "#c2410c",
     surface: "linear-gradient(180deg, #fff7ed 0%, #fed7aa 100%)"
-  },
-  {
-    key: "distribuidora",
-    title: "Distribuidora",
-    description: "Modulo oficial listo para seguir creciendo.",
-    route: "/distribuidora",
-    accent: "#15803d",
-    surface: "linear-gradient(180deg, #f0fdf4 0%, #dcfce7 100%)"
   }
 ];
 

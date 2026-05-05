@@ -24,6 +24,12 @@ export type TenantContext = {
     blockedReason: string | null;
   };
   modules: string[];
+  products?: Array<{
+    key: string;
+    label: string;
+    frontend: string;
+  }>;
+  preferredFrontend?: string | null;
 };
 
 export type StoredAuthUser = AuthUser & {

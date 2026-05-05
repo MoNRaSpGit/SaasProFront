@@ -1,12 +1,9 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { DashboardPage } from "../features/auth/DashboardPage";
 import { CamionesHomePage } from "../features/camiones/CamionesHomePage";
-import { DistribuidoraAdminPage } from "../features/distribuidora/DistribuidoraAdminPage";
-import { DistribuidoraHomePage } from "../features/distribuidora/DistribuidoraHomePage";
 import { LoginPage } from "../features/auth/LoginPage";
 import { ProtectedRoute } from "../features/auth/ProtectedRoute";
 import { RegisterPage } from "../features/auth/RegisterPage";
-import { PosHomePage } from "../features/pos/PosHomePage";
 import { SaasAdminHomePage } from "../features/saas-admin/SaasAdminHomePage";
 
 function HealthPage() {
@@ -40,30 +37,6 @@ export function App() {
         }
       />
       <Route
-        path="/pos"
-        element={
-          <ProtectedRoute requiredModule="pos">
-            <PosHomePage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/distribuidora"
-        element={
-          <ProtectedRoute requiredModule="distribuidora">
-            <DistribuidoraHomePage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/distribuidora/admin"
-        element={
-          <ProtectedRoute requiredModule="distribuidora" requiredCapability="distribuidora.admin.read">
-            <DistribuidoraAdminPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
         path="/camiones"
         element={
           <ProtectedRoute requiredModule="camiones">
@@ -72,6 +45,7 @@ export function App() {
         }
       />
       <Route path="/health" element={<HealthPage />} />
+      <Route path="*" element={<Navigate to="/camiones" replace />} />
     </Routes>
   );
 }

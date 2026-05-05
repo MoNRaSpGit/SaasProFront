@@ -5,7 +5,7 @@ export type SaasAdminTenantBilling = {
   blockedReason: string | null;
 };
 
-export type SaasAdminModuleKey = "camiones" | "distribuidora" | "pos";
+export type SaasAdminModuleKey = "camiones";
 
 export type SaasAdminTenantItem = {
   id: number;
