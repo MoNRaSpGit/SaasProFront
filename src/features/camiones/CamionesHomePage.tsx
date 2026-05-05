@@ -70,6 +70,7 @@ function getTripRouteParts(trip: CamionesTrip) {
 export function CamionesHomePage() {
   const CLIENTS_PAGE_SIZE = 3;
   const GROUP_TRIPS_PAGE_SIZE = 3;
+  const showLegacyRouteInputs = false;
   const clientInputRef = useRef<HTMLInputElement | null>(null);
   const placeInputRef = useRef<HTMLInputElement | null>(null);
   const destinationInputRef = useRef<HTMLInputElement | null>(null);
@@ -89,8 +90,6 @@ export function CamionesHomePage() {
   const [selectedFromPlace, setSelectedFromPlace] = useState<CamionesPlace | null>(null);
   const [toPlaceSearch, setToPlaceSearch] = useState("");
   const [selectedToPlace, setSelectedToPlace] = useState<CamionesPlace | null>(null);
-  const [activeRouteField, setActiveRouteField] = useState<RouteField>("from");
-  const [routePickerOpenField, setRoutePickerOpenField] = useState<RouteField | null>(null);
   const [kilometers, setKilometers] = useState("");
   const [tripFilter, setTripFilter] = useState<TripFilter>("all");
   const [clientsLoading, setClientsLoading] = useState(true);
@@ -117,6 +116,7 @@ export function CamionesHomePage() {
   const [tripDraftKilometers, setTripDraftKilometers] = useState("");
   const [visibleTripsByGroup, setVisibleTripsByGroup] = useState<Record<string, number>>({});
   const [expandedTripGroups, setExpandedTripGroups] = useState<Record<string, boolean>>({});
+  const routePickerOpenField: RouteField | null = null;
 
   function getTempId() {
     const nextId = tempIdRef.current;
@@ -142,7 +142,7 @@ export function CamionesHomePage() {
 
   function buildOptimisticPlace(id: number, name: string): CamionesPlace {
     const timestamp = new Date().toISOString();
-    const source = selectedToPlace ?? selectedFromPlace ?? places[0];
+    const source = places[0];
     return {
       id,
       tenantId: source?.tenantId ?? 0,
@@ -157,8 +157,8 @@ export function CamionesHomePage() {
 
   function buildOptimisticTrip(
     client: CamionesClient,
-    fromPlace: CamionesPlace,
-    toPlace: CamionesPlace,
+    fromPlaceName: string,
+    toPlaceName: string,
     date: string,
     tripKilometers: number
   ): CamionesTrip {
@@ -170,13 +170,13 @@ export function CamionesHomePage() {
       branchId: client.branchId ?? source?.branchId ?? null,
       userId: source?.userId ?? 0,
       clientId: client.id,
-      placeId: toPlace.id,
+      placeId: null,
       clientName: client.name,
       tripDate: date,
-      place: toPlace.name,
+      place: toPlaceName,
       kilometers: Number(tripKilometers.toFixed(2)),
       status: "pending",
-      notes: buildRouteNotes(fromPlace.name),
+      notes: buildRouteNotes(fromPlaceName),
       updatedAt: timestamp,
       createdAt: timestamp,
       paidAt: null
@@ -258,12 +258,15 @@ export function CamionesHomePage() {
     }
 
     if (tab === "viaje") {
-      void ensurePlacesLoaded();
       placeInputRef.current?.focus();
     }
 
     if (tab === "registro") {
       void ensureTripsLoaded();
+    }
+
+    if (tab === "localidad") {
+      void ensurePlacesLoaded();
     }
 
   }, [ensurePlacesLoaded, ensureTripsLoaded, tab]);
@@ -381,8 +384,6 @@ export function CamionesHomePage() {
     setSelectedFromPlace(null);
     setToPlaceSearch("");
     setSelectedToPlace(null);
-    setActiveRouteField("from");
-    setRoutePickerOpenField(null);
     setKilometers("");
   }
 
@@ -395,19 +396,11 @@ export function CamionesHomePage() {
   }
 
   function selectPlace(place: CamionesPlace) {
-    if (activeRouteField === "from") {
-      setSelectedFromPlace(place);
-      setFromPlaceSearch(place.name);
-      destinationInputRef.current?.focus();
-      setActiveRouteField("to");
-      setRoutePickerOpenField(null);
-      return;
-    }
+    void place;
+  }
 
-    setSelectedToPlace(place);
-    setToPlaceSearch(place.name);
-    setRoutePickerOpenField(null);
-    kilometersInputRef.current?.focus();
+  function toggleRoutePicker(field: RouteField) {
+    void field;
   }
 
   function openClientCreateModal() {
@@ -425,11 +418,6 @@ export function CamionesHomePage() {
     setClientDraftName("");
     setClientDraftPhone("");
     setClientDeleteConfirmOpen(false);
-  }
-
-  function toggleRoutePicker(field: RouteField) {
-    setActiveRouteField(field);
-    setRoutePickerOpenField((current) => (current === field ? null : field));
   }
 
   function closePlaceModal() {
@@ -758,6 +746,8 @@ export function CamionesHomePage() {
 
   async function handleSaveTrip() {
     const kmValue = Number(kilometers);
+    const fromPlaceName = fromPlaceSearch.trim();
+    const toPlaceName = toPlaceSearch.trim();
 
     if (!selectedClient) {
       toast.error("Falta el cliente");
@@ -769,12 +759,12 @@ export function CamionesHomePage() {
       return;
     }
 
-    if (!selectedFromPlace) {
+    if (!fromPlaceName) {
       toast.error("Falta el origen");
       return;
     }
 
-    if (!selectedToPlace) {
+    if (!toPlaceName) {
       toast.error("Falta el destino");
       return;
     }
@@ -794,7 +784,7 @@ export function CamionesHomePage() {
     const previousSelectedToPlace = selectedToPlace;
     const previousKilometers = kilometers;
     const previousTab = tab;
-    const optimisticTrip = buildOptimisticTrip(selectedClient, selectedFromPlace, selectedToPlace, tripDate, kmValue);
+    const optimisticTrip = buildOptimisticTrip(selectedClient, fromPlaceName, toPlaceName, tripDate, kmValue);
 
     setSavingTrip(true);
     setTrips((current) => [optimisticTrip, ...current]);
@@ -803,7 +793,6 @@ export function CamionesHomePage() {
     setSelectedFromPlace(null);
     setToPlaceSearch("");
     setSelectedToPlace(null);
-    setActiveRouteField("from");
     setKilometers("");
     setTripFilter("all");
     setTab("registro");
@@ -813,10 +802,10 @@ export function CamionesHomePage() {
     try {
       const payload = await createCamionesTrip({
         clientId: selectedClient.id,
-        placeId: selectedToPlace.id,
+        placeName: toPlaceName,
         tripDate,
         kilometers: Number(kmValue.toFixed(2)),
-        notes: buildRouteNotes(selectedFromPlace.name)
+        notes: buildRouteNotes(fromPlaceName)
       });
       setTrips((current) => current.map((trip) => (trip.id === optimisticTrip.id ? payload.trip : trip)));
       void refreshTrips();
@@ -874,12 +863,6 @@ export function CamionesHomePage() {
       return;
     }
 
-    const matchedPlace = places.find((place) => normalizeText(place.name) === normalizeText(placeName));
-    if (!matchedPlace) {
-      toast.error("Elige un lugar existente");
-      return;
-    }
-
     const previousTrips = trips;
     setSavingTripEdit(true);
     setTrips((current) =>
@@ -888,8 +871,8 @@ export function CamionesHomePage() {
           ? {
               ...trip,
               tripDate: tripDateValue,
-              placeId: matchedPlace.id,
-              place: matchedPlace.name,
+              placeId: null,
+              place: placeName,
               kilometers: Number(kilometersValue.toFixed(2)),
               updatedAt: new Date().toISOString()
             }
@@ -905,7 +888,7 @@ export function CamionesHomePage() {
 
     try {
       await updateCamionesTrip(tripId, {
-        placeId: matchedPlace.id,
+        placeName,
         tripDate: tripDateValue,
         kilometers: Number(kilometersValue.toFixed(2))
       });
@@ -933,12 +916,7 @@ export function CamionesHomePage() {
             <ModelUserMenu
               variant="dark"
               showDashboardLink={false}
-              menuActions={[
-                {
-                  label: "Agr. Localidad",
-                  onSelect: () => setTab("localidad")
-                }
-              ]}
+              menuActions={[]}
             />
           </div>
         </header>
@@ -1060,6 +1038,45 @@ export function CamionesHomePage() {
               <div style={routeInputsWrapStyle}>
                 <label style={fieldWrapStyle}>
                   <span style={fieldLabelStyle}>Desde</span>
+                  <input
+                    ref={placeInputRef}
+                    type="text"
+                    value={fromPlaceSearch}
+                    onChange={(event) => setFromPlaceSearch(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        destinationInputRef.current?.focus();
+                      }
+                    }}
+                    placeholder="Escribe el origen"
+                    style={inputStyle}
+                  />
+                </label>
+
+                <label style={fieldWrapStyle}>
+                  <span style={fieldLabelStyle}>Hasta</span>
+                  <input
+                    ref={destinationInputRef}
+                    type="text"
+                    value={toPlaceSearch}
+                    onChange={(event) => setToPlaceSearch(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        kilometersInputRef.current?.focus();
+                      }
+                    }}
+                    placeholder="Escribe el destino"
+                    style={inputStyle}
+                  />
+                </label>
+              </div>
+
+              {showLegacyRouteInputs ? (
+              <div style={routeInputsWrapStyle}>
+                <label style={fieldWrapStyle}>
+                  <span style={fieldLabelStyle}>Desde</span>
                   <div style={routeFieldWrapStyle}>
                     <div style={routeFieldRowStyle}>
                       <input
@@ -1158,6 +1175,7 @@ export function CamionesHomePage() {
                   </div>
                 </label>
               </div>
+              ) : null}
 
               <label style={fieldWrapStyle}>
                 <span style={fieldLabelStyle}>Kilometros</span>

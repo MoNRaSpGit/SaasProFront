@@ -125,7 +125,8 @@ export async function listCamionesTrips(params?: {
 
 export async function createCamionesTrip(payload: {
   clientId: number;
-  placeId: number;
+  placeId?: number;
+  placeName?: string;
   tripDate: string;
   kilometers: number;
   notes?: string;
@@ -150,7 +151,8 @@ export async function markCamionesTripPaid(tripId: number) {
 export async function updateCamionesTrip(
   tripId: number,
   payload: {
-    placeId: number;
+    placeId?: number;
+    placeName?: string;
     tripDate: string;
     kilometers: number;
     notes?: string;
