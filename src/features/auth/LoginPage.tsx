@@ -8,8 +8,8 @@ import { AuthSession } from "./auth.types";
 type LoginResponse = AuthSession;
 
 const CAMIONES_DEMO_ACCESS = {
-  email: "operaciones.demo@saaspro.com",
-  password: "opsdemo123"
+  email: "camiones.demo@saaspro.com",
+  password: "camiones123"
 };
 
 export function LoginPage() {
