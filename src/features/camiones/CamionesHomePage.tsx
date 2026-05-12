@@ -1693,12 +1693,12 @@ export function CamionesHomePage() {
               </label>
 
               <label style={fieldWrapStyle}>
-                <span style={fieldLabelStyle}>Lugar</span>
+                <span style={fieldLabelStyle}>Destino</span>
                 <input
                   type="text"
                   value={tripDraftPlace}
                   onChange={(event) => setTripDraftPlace(event.target.value)}
-                  placeholder="Lugar del viaje"
+                  placeholder="Destino del viaje"
                   style={inputStyle}
                 />
               </label>
