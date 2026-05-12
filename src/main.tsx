@@ -11,6 +11,12 @@ import "./styles/toastify-overrides.css";
 const queryClient = new QueryClient();
 const Router = import.meta.env.MODE === "github-pages" ? HashRouter : BrowserRouter;
 
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}service-worker.js`);
+  });
+}
+
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>

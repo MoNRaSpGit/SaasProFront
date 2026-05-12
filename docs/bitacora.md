@@ -9,6 +9,14 @@ En la pantalla de `Viaje` se agrego soporte para cargar:
 - valor por kilometro
 - calculo automatico del total del viaje
 
+Tambien se dejo el frontend listo como `PWA` base:
+
+- `manifest.webmanifest`
+- `service worker`
+- registro automatico en produccion
+- iconos propios del modulo
+- icono PWA tomado de `Camion.png` compartido por el cliente
+
 ## Alcance actual
 
 El flujo nuevo permite:
