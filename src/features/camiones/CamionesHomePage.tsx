@@ -1868,11 +1868,16 @@ export function CamionesHomePage() {
               ) : null}
             </div>
 
-            <div style={modalActionsStyle}>
-              <button type="button" onClick={closeTripModal} style={modalCancelButtonStyle}>
+            <div style={tripModalActionsStyle}>
+              <button type="button" onClick={closeTripModal} style={tripModalActionButtonStyle}>
                 Cancelar
               </button>
-              <button type="button" onClick={() => void handleSaveTripVisualEdit()} style={saveButtonStyle} disabled={savingTripEdit}>
+              <button
+                type="button"
+                onClick={() => void handleSaveTripVisualEdit()}
+                style={tripModalPrimaryActionButtonStyle}
+                disabled={savingTripEdit}
+              >
                 {savingTripEdit ? "Guardando..." : "Guardar cambios"}
               </button>
             </div>
@@ -2577,6 +2582,12 @@ const modalActionsStyle: React.CSSProperties = {
   flexWrap: "wrap"
 };
 
+const tripModalActionsStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gap: 10
+};
+
 const modalActionsSplitStyle: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
@@ -2604,6 +2615,18 @@ const modalCancelButtonStyle: React.CSSProperties = {
   fontWeight: 800,
   fontSize: 16,
   cursor: "pointer"
+};
+
+const tripModalActionButtonStyle: React.CSSProperties = {
+  ...modalCancelButtonStyle,
+  width: "100%",
+  minWidth: 0
+};
+
+const tripModalPrimaryActionButtonStyle: React.CSSProperties = {
+  ...saveButtonStyle,
+  width: "100%",
+  minWidth: 0
 };
 
 const modalDangerButtonStyle: React.CSSProperties = {
