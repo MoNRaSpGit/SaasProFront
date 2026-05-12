@@ -112,7 +112,7 @@ export async function archiveCamionesPlace(placeId: number) {
 export async function listCamionesTrips(params?: {
   limit?: number;
   clientId?: number;
-  status?: "pending" | "paid" | "cancelled";
+  status?: "confirmed" | "pending" | "paid" | "cancelled";
 }) {
   const searchParams = new URLSearchParams();
   if (params?.limit) searchParams.set("limit", String(params.limit));
@@ -155,6 +155,8 @@ export async function updateCamionesTrip(
     placeName?: string;
     tripDate: string;
     kilometers: number;
+    status?: "confirmed" | "pending" | "paid";
+    collectedAmount?: number;
     notes?: string;
   }
 ) {
@@ -165,4 +167,12 @@ export async function updateCamionesTrip(
   });
 
   return readJson<{ trip: CamionesTripsResponse["items"][number] }>(response);
+}
+
+export async function deleteCamionesTrip(tripId: number) {
+  const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/camiones/trips/${tripId}`, {
+    method: "DELETE"
+  });
+
+  return readJson<{ ok: true }>(response);
 }

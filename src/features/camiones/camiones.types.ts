@@ -10,7 +10,7 @@ export type CamionesClient = {
   updatedAt: string;
 };
 
-export type CamionesTripStatus = "pending" | "paid" | "cancelled";
+export type CamionesTripStatus = "confirmed" | "pending" | "paid" | "cancelled";
 
 export type CamionesTrip = {
   id: number;
@@ -24,6 +24,7 @@ export type CamionesTrip = {
   place: string;
   kilometers: number;
   status: CamionesTripStatus;
+  collectedAmount: number | null;
   notes: string | null;
   updatedAt: string;
   createdAt: string;
