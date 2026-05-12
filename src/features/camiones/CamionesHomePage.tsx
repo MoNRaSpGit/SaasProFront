@@ -2548,17 +2548,21 @@ const modalOverlayStyle: React.CSSProperties = {
   display: "grid",
   placeItems: "center",
   padding: 16,
-  zIndex: 60
+  zIndex: 60,
+  overflowY: "auto"
 };
 
 const modalCardStyle: React.CSSProperties = {
   width: "100%",
   maxWidth: 420,
+  maxHeight: "calc(100vh - 32px)",
   padding: 20,
   borderRadius: 24,
   background: "#fffdf9",
   border: "1px solid #ded3c6",
-  boxShadow: "0 24px 50px rgba(26, 18, 14, 0.22)"
+  boxShadow: "0 24px 50px rgba(26, 18, 14, 0.22)",
+  boxSizing: "border-box",
+  overflowY: "auto"
 };
 
 const confirmModalCardStyle: React.CSSProperties = {
