@@ -76,21 +76,29 @@ function readTripMeta(notes: string | null) {
 
   const tokens = notes.split(TRIP_NOTES_SEPARATOR).map((token) => token.trim()).filter(Boolean);
   const sourceTokens = tokens.length > 0 ? tokens : [notes];
+  let detectedStructuredToken = false;
 
   for (const token of sourceTokens) {
     if (token.startsWith(ROUTE_FROM_PREFIX)) {
+      detectedStructuredToken = true;
       meta.fromPlaceName = token.slice(ROUTE_FROM_PREFIX.length).trim();
       continue;
     }
 
     if (token.startsWith(RATE_PER_KM_PREFIX)) {
+      detectedStructuredToken = true;
       meta.ratePerKilometer = parsePositiveNumber(token.slice(RATE_PER_KM_PREFIX.length).trim());
       continue;
     }
 
     if (token.startsWith(TOTAL_AMOUNT_PREFIX)) {
+      detectedStructuredToken = true;
       meta.totalAmount = parsePositiveNumber(token.slice(TOTAL_AMOUNT_PREFIX.length).trim());
     }
+  }
+
+  if (!detectedStructuredToken && notes.trim()) {
+    meta.fromPlaceName = notes.trim();
   }
 
   return meta;
@@ -168,6 +176,7 @@ export function CamionesHomePage() {
   const [placeDraftName, setPlaceDraftName] = useState("");
   const [tripModalState, setTripModalState] = useState<TripModalState>(null);
   const [tripDraftDate, setTripDraftDate] = useState("");
+  const [tripDraftFromPlace, setTripDraftFromPlace] = useState("");
   const [tripDraftPlace, setTripDraftPlace] = useState("");
   const [tripDraftKilometers, setTripDraftKilometers] = useState("");
   const [tripDraftRatePerKilometer, setTripDraftRatePerKilometer] = useState("");
@@ -498,8 +507,10 @@ export function CamionesHomePage() {
   }
 
   function openTripEditModal(trip: CamionesTrip) {
+    const tripMeta = readTripMeta(trip.notes);
     const pricing = getTripPricing(trip);
     setTripDraftDate(trip.tripDate.includes("T") ? trip.tripDate.slice(0, 10) : trip.tripDate);
+    setTripDraftFromPlace(tripMeta.fromPlaceName);
     setTripDraftPlace(trip.place);
     setTripDraftKilometers(String(trip.kilometers));
     setTripDraftRatePerKilometer(pricing.ratePerKilometer ? String(pricing.ratePerKilometer) : "");
@@ -513,6 +524,7 @@ export function CamionesHomePage() {
 
     setTripModalState(null);
     setTripDraftDate("");
+    setTripDraftFromPlace("");
     setTripDraftPlace("");
     setTripDraftKilometers("");
     setTripDraftRatePerKilometer("");
@@ -921,6 +933,7 @@ export function CamionesHomePage() {
   async function handleSaveTripVisualEdit() {
     const tripId = tripModalState?.tripId;
     const tripDateValue = tripDraftDate.trim();
+    const fromPlaceName = tripDraftFromPlace.trim();
     const placeName = tripDraftPlace.trim();
     const kilometersValue = Number(tripDraftKilometers);
     const rateValue = Number(tripDraftRatePerKilometer);
@@ -931,6 +944,11 @@ export function CamionesHomePage() {
 
     if (!tripDateValue) {
       toast.error("Falta la fecha");
+      return;
+    }
+
+    if (!fromPlaceName) {
+      toast.error("Falta el origen");
       return;
     }
 
@@ -949,9 +967,6 @@ export function CamionesHomePage() {
       return;
     }
 
-    const currentTrip = trips.find((trip) => trip.id === tripId);
-    const currentTripMeta = currentTrip ? readTripMeta(currentTrip.notes) : null;
-
     const previousTrips = trips;
     setSavingTripEdit(true);
     setTrips((current) =>
@@ -963,7 +978,7 @@ export function CamionesHomePage() {
               placeId: null,
               place: placeName,
               kilometers: Number(kilometersValue.toFixed(2)),
-              notes: buildTripNotes(currentTripMeta?.fromPlaceName || "", rateValue, kilometersValue),
+              notes: buildTripNotes(fromPlaceName, rateValue, kilometersValue),
               updatedAt: new Date().toISOString()
             }
           : trip
@@ -971,6 +986,7 @@ export function CamionesHomePage() {
     );
     setTripModalState(null);
     setTripDraftDate("");
+    setTripDraftFromPlace("");
     setTripDraftPlace("");
     setTripDraftKilometers("");
     setTripDraftRatePerKilometer("");
@@ -982,7 +998,7 @@ export function CamionesHomePage() {
         placeName,
         tripDate: tripDateValue,
         kilometers: Number(kilometersValue.toFixed(2)),
-        notes: buildTripNotes(currentTripMeta?.fromPlaceName || "", rateValue, kilometersValue)
+        notes: buildTripNotes(fromPlaceName, rateValue, kilometersValue)
       });
       void refreshTrips();
     } catch (error) {
@@ -1663,6 +1679,17 @@ export function CamionesHomePage() {
               <label style={fieldWrapStyle}>
                 <span style={fieldLabelStyle}>Fecha</span>
                 <input type="date" value={tripDraftDate} onChange={(event) => setTripDraftDate(event.target.value)} style={inputStyle} />
+              </label>
+
+              <label style={fieldWrapStyle}>
+                <span style={fieldLabelStyle}>Origen</span>
+                <input
+                  type="text"
+                  value={tripDraftFromPlace}
+                  onChange={(event) => setTripDraftFromPlace(event.target.value)}
+                  placeholder="Origen del viaje"
+                  style={inputStyle}
+                />
               </label>
 
               <label style={fieldWrapStyle}>
