@@ -22,6 +22,8 @@ function resolveGitShortSha() {
 
 const frontendReleaseSha = process.env.VITE_RELEASE_SHA || process.env.RELEASE_SHA || resolveGitShortSha();
 const frontendReleaseCreatedAt = process.env.VITE_RELEASE_CREATED_AT || process.env.RELEASE_CREATED_AT || new Date().toISOString();
+const DEV_SERVER_PORT = 5174;
+const PREVIEW_SERVER_PORT = 4174;
 
 export default defineConfig(({ mode }) => {
   const isGithubPagesBuild = mode === "github-pages";
@@ -38,6 +40,14 @@ export default defineConfig(({ mode }) => {
 
   return {
     base: isGithubPagesBuild ? "/SaasProFront/" : "/",
+    server: {
+      port: DEV_SERVER_PORT,
+      strictPort: true
+    },
+    preview: {
+      port: PREVIEW_SERVER_PORT,
+      strictPort: true
+    },
     plugins: [
       react(),
       {
