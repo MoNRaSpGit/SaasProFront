@@ -52,6 +52,10 @@ function normalizeText(value: string) {
   return value.trim().toLowerCase();
 }
 
+function normalizeEntityName(value: string) {
+  return value.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
 function formatMoneyLabel(value: number) {
   return `$${value.toFixed(2)}`;
 }
@@ -429,14 +433,12 @@ export function CamionesHomePage() {
       {
         clientId: number;
         clientName: string;
-        tripDate: string;
         items: CamionesTrip[];
       }
     >();
 
     for (const trip of filteredTrips) {
-      const normalizedDate = trip.tripDate.includes("T") ? trip.tripDate.slice(0, 10) : trip.tripDate;
-      const key = `${trip.clientId}:${normalizedDate}`;
+      const key = String(trip.clientId);
       const existingGroup = groups.get(key);
 
       if (existingGroup) {
@@ -447,23 +449,34 @@ export function CamionesHomePage() {
       groups.set(key, {
         clientId: trip.clientId,
         clientName: trip.clientName,
-        tripDate: normalizedDate,
         items: [trip]
       });
     }
 
     return Array.from(groups.values()).map((group) => {
       const orderedItems = [...group.items].sort((left, right) => {
-        const leftTime = new Date(left.createdAt).getTime();
-        const rightTime = new Date(right.createdAt).getTime();
-        return leftTime - rightTime;
+        const leftTime = new Date(left.tripDate).getTime();
+        const rightTime = new Date(right.tripDate).getTime();
+
+        if (leftTime !== rightTime) {
+          return rightTime - leftTime;
+        }
+
+        return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
       });
 
-      const groupKey = `${group.clientId}:${group.tripDate}`;
+      const latestTripDate = orderedItems[0]?.tripDate.includes("T") ? orderedItems[0].tripDate.slice(0, 10) : orderedItems[0]?.tripDate ?? "";
+      const oldestTripDate =
+        orderedItems[orderedItems.length - 1]?.tripDate.includes("T")
+          ? orderedItems[orderedItems.length - 1].tripDate.slice(0, 10)
+          : orderedItems[orderedItems.length - 1]?.tripDate ?? "";
+      const groupKey = String(group.clientId);
       return {
         ...group,
         groupKey,
         items: orderedItems,
+        latestTripDate,
+        oldestTripDate,
         totalKilometers: orderedItems.reduce((total, trip) => total + trip.kilometers, 0),
         pendingKilometers: orderedItems.reduce((total, trip) => (trip.status === "paid" ? total : total + trip.kilometers), 0),
         pendingAmount: orderedItems.reduce((total, trip) => {
@@ -642,9 +655,25 @@ export function CamionesHomePage() {
               name,
               phone: phone || undefined
             });
-      setClients((current) => current.map((client) => (client.id === nextClient.id ? payload.item : client)));
-      setSelectedClient((current) => (current?.id === nextClient.id ? payload.item : current));
-      setRecentClientId((current) => (current === nextClient.id ? payload.item.id : current));
+      setClients((current) => {
+        const deduped = current.filter((client) => {
+          if (client.id === nextClient.id || client.id === payload.item.id) {
+            return false;
+          }
+
+          return normalizeEntityName(client.name) !== normalizeEntityName(payload.item.name);
+        });
+
+        return [payload.item, ...deduped].sort((left, right) => left.name.localeCompare(right.name, "es"));
+      });
+      setSelectedClient((current) => {
+        if (mode === "edit" && current?.id === editingClientId) {
+          return payload.item;
+        }
+
+        return current?.id === nextClient.id ? payload.item : current;
+      });
+      setRecentClientId((current) => (current === nextClient.id || current === payload.item.id ? payload.item.id : current));
       setClientSearch((current) => (normalizeText(current) === normalizeText(nextClient.name) ? payload.item.name : current));
       void refreshClients();
       void refreshTrips();
@@ -1495,15 +1524,20 @@ export function CamionesHomePage() {
                 const isExpanded = expandedTripGroups[group.groupKey] ?? false;
                 const visibleTrips = [...group.items]
                   .map((trip, index) => ({ trip, sequence: index + 1 }))
-                  .reverse()
                   .slice(0, visibleTripsCount);
 
                 return (
-                  <article key={`${group.clientId}-${group.tripDate}`} style={isGroupFullyPaid ? historyCardStyle : tripCardStyle}>
+                  <article key={group.groupKey} style={isGroupFullyPaid ? historyCardStyle : tripCardStyle}>
                     <div style={tripCardTopRowStyle}>
                       <div style={{ display: "grid", gap: 6 }}>
                         <strong style={{ fontSize: 19, color: "#2f241e" }}>{group.clientName}</strong>
-                        <span style={tripMetaStyle}>{formatDateLabel(group.tripDate)}</span>
+                        <span style={tripMetaStyle}>
+                          {group.latestTripDate
+                            ? group.latestTripDate === group.oldestTripDate
+                              ? `Fecha: ${formatDateLabel(group.latestTripDate)}`
+                              : `Ultimo: ${formatDateLabel(group.latestTripDate)}`
+                            : "Sin fecha"}
+                        </span>
                       </div>
                       <span style={tripCountBadgeStyle}>
                         {group.items.length} viaje{group.items.length > 1 ? "s" : ""}
@@ -1524,7 +1558,7 @@ export function CamionesHomePage() {
                     </button>
 
                     {isExpanded ? <div style={tripStackStyle}>
-                      {visibleTrips.map(({ trip, sequence }) => {
+                      {visibleTrips.map(({ trip }) => {
                         const route = getTripRouteParts(trip);
                         const financials = getTripFinancials(trip);
 
@@ -1532,7 +1566,7 @@ export function CamionesHomePage() {
                           <div key={trip.id} style={tripRouteItemStyle}>
                             <div style={tripRouteCellStyle}>
                               <div style={tripInlineRowStyle}>
-                                <span style={tripInlineIndexStyle}>V{sequence}</span>
+                                <span style={tripInlineIndexStyle}>{formatDateLabel(trip.tripDate)}</span>
                                 <div style={tripInlineRouteStyle}>
                                   <span style={tripInlinePlaceStyle}>{route.from}</span>
                                   <span style={tripRouteArrowStyle}>→</span>

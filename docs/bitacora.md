@@ -1,8 +1,24 @@
 # Bitacora `frontend-camiones`
 
-Fecha de actualizacion: 2026-05-12
+Fecha de actualizacion: 2026-05-18
 
 ## Cambio reciente
+
+En `Registro` los viajes ahora se agrupan por cliente y no por cliente + fecha.
+
+Eso deja el comportamiento esperado por operacion:
+
+- si existe `Juan Perez`, todos sus viajes quedan dentro del mismo bloque
+- si se crea otro viaje para `Juan Perez`, no aparece otra tarjeta separada por fecha
+- cada viaje sigue mostrando su propia fecha dentro del detalle expandido
+
+Tambien se ajusto el guardado visual de clientes:
+
+- si backend devuelve un cliente ya existente por nombre normalizado, el frontend reemplaza el optimista y no deja duplicados visibles
+
+Ademas se alinea con la regla nueva de backend:
+
+- diferencias solo de espacios o mayusculas no deben generar otro cliente aparte
 
 En este corte `camiones` paso de un flujo simple de pago/no pago a un flujo mas operativo.
 
