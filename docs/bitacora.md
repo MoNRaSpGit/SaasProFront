@@ -166,3 +166,13 @@ Los viajes creados antes de este cambio:
 
 - se reinterpretan como `confirmed` si venian del uso viejo de `pending`
 - siguen pudiendo abrirse desde `Editar registro`
+
+## Descripcion en viajes
+
+Se agrego una caja `Descripcion` en la carga y edicion de viajes de `camiones`.
+
+Este dato:
+
+- se puede completar junto con kilometros, origen, destino y tarifa
+- queda visible dentro de `Registro`
+- se persiste dentro de `notes` del viaje sin romper compatibilidad con viajes anteriores

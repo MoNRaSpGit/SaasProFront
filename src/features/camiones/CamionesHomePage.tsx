@@ -28,6 +28,7 @@ const ROUTE_FROM_PREFIX = "route-from::";
 const RATE_PER_KM_PREFIX = "rate-per-km::";
 const TOTAL_AMOUNT_PREFIX = "trip-total::";
 const COLLECTED_AMOUNT_PREFIX = "collected-amount::";
+const DESCRIPTION_PREFIX = "trip-description::";
 const TRIP_NOTES_SEPARATOR = "||";
 
 function getTodayDate() {
@@ -74,7 +75,8 @@ function readTripMeta(notes: string | null) {
     fromPlaceName: "",
     ratePerKilometer: null as number | null,
     totalAmount: null as number | null,
-    collectedAmount: null as number | null
+    collectedAmount: null as number | null,
+    description: ""
   };
 
   if (!notes) {
@@ -107,6 +109,12 @@ function readTripMeta(notes: string | null) {
     if (token.startsWith(COLLECTED_AMOUNT_PREFIX)) {
       detectedStructuredToken = true;
       meta.collectedAmount = parsePositiveNumber(token.slice(COLLECTED_AMOUNT_PREFIX.length).trim());
+      continue;
+    }
+
+    if (token.startsWith(DESCRIPTION_PREFIX)) {
+      detectedStructuredToken = true;
+      meta.description = token.slice(DESCRIPTION_PREFIX.length).trim();
     }
   }
 
@@ -117,7 +125,13 @@ function readTripMeta(notes: string | null) {
   return meta;
 }
 
-function buildTripNotes(fromPlaceName: string, ratePerKilometer: number, tripKilometers: number, collectedAmount?: number | null) {
+function buildTripNotes(
+  fromPlaceName: string,
+  ratePerKilometer: number,
+  tripKilometers: number,
+  collectedAmount?: number | null,
+  description?: string
+) {
   const normalizedRate = Number(ratePerKilometer.toFixed(2));
   const totalAmount = Number((normalizedRate * tripKilometers).toFixed(2));
   const tokens = [
@@ -128,6 +142,10 @@ function buildTripNotes(fromPlaceName: string, ratePerKilometer: number, tripKil
 
   if (typeof collectedAmount === "number" && Number.isFinite(collectedAmount) && collectedAmount > 0) {
     tokens.push(`${COLLECTED_AMOUNT_PREFIX}${Number(collectedAmount.toFixed(2)).toFixed(2)}`);
+  }
+
+  if (description?.trim()) {
+    tokens.push(`${DESCRIPTION_PREFIX}${description.trim()}`);
   }
 
   return tokens.join(TRIP_NOTES_SEPARATOR);
@@ -192,6 +210,7 @@ export function CamionesHomePage() {
   const [selectedToPlace, setSelectedToPlace] = useState<CamionesPlace | null>(null);
   const [kilometers, setKilometers] = useState("");
   const [ratePerKilometer, setRatePerKilometer] = useState("");
+  const [tripDescription, setTripDescription] = useState("");
   const [tripFilter, setTripFilter] = useState<TripFilter>("all");
   const [clientsLoading, setClientsLoading] = useState(true);
   const [tripsLoading, setTripsLoading] = useState(false);
@@ -217,6 +236,7 @@ export function CamionesHomePage() {
   const [tripDraftPlace, setTripDraftPlace] = useState("");
   const [tripDraftKilometers, setTripDraftKilometers] = useState("");
   const [tripDraftRatePerKilometer, setTripDraftRatePerKilometer] = useState("");
+  const [tripDraftDescription, setTripDraftDescription] = useState("");
   const [tripDraftStatus, setTripDraftStatus] = useState<"confirmed" | "pending" | "paid">("confirmed");
   const [tripDraftCollectedAmount, setTripDraftCollectedAmount] = useState("");
   const [tripDeleteConfirmState, setTripDeleteConfirmState] = useState<TripDeleteConfirmState>(null);
@@ -267,7 +287,8 @@ export function CamionesHomePage() {
     toPlaceName: string,
     date: string,
     tripKilometers: number,
-    tripRatePerKilometer: number
+    tripRatePerKilometer: number,
+    description: string
   ): CamionesTrip {
     const timestamp = new Date().toISOString();
     const source = trips[0];
@@ -284,7 +305,7 @@ export function CamionesHomePage() {
       kilometers: Number(tripKilometers.toFixed(2)),
       status: "confirmed",
       collectedAmount: null,
-      notes: buildTripNotes(fromPlaceName, tripRatePerKilometer, tripKilometers),
+      notes: buildTripNotes(fromPlaceName, tripRatePerKilometer, tripKilometers, null, description),
       updatedAt: timestamp,
       createdAt: timestamp,
       paidAt: null
@@ -504,6 +525,7 @@ export function CamionesHomePage() {
     setSelectedToPlace(null);
     setKilometers("");
     setRatePerKilometer("");
+    setTripDescription("");
   }
 
   function selectClient(client: CamionesClient) {
@@ -556,6 +578,7 @@ export function CamionesHomePage() {
     setTripDraftPlace(trip.place);
     setTripDraftKilometers(String(trip.kilometers));
     setTripDraftRatePerKilometer(financials.ratePerKilometer ? String(financials.ratePerKilometer) : "");
+    setTripDraftDescription(tripMeta.description);
     setTripDraftStatus(trip.status === "cancelled" ? "confirmed" : trip.status);
     setTripDraftCollectedAmount(
       trip.status === "pending" && financials.collectedAmount > 0 ? String(financials.collectedAmount) : ""
@@ -574,6 +597,7 @@ export function CamionesHomePage() {
     setTripDraftPlace("");
     setTripDraftKilometers("");
     setTripDraftRatePerKilometer("");
+    setTripDraftDescription("");
     setTripDraftStatus("confirmed");
     setTripDraftCollectedAmount("");
   }
@@ -916,6 +940,7 @@ export function CamionesHomePage() {
     const rateValue = Number(ratePerKilometer);
     const fromPlaceName = fromPlaceSearch.trim();
     const toPlaceName = toPlaceSearch.trim();
+    const description = tripDescription.trim();
 
     if (!selectedClient) {
       toast.error("Falta el cliente");
@@ -957,8 +982,9 @@ export function CamionesHomePage() {
     const previousSelectedToPlace = selectedToPlace;
     const previousKilometers = kilometers;
     const previousRatePerKilometer = ratePerKilometer;
+    const previousTripDescription = tripDescription;
     const previousTab = tab;
-    const optimisticTrip = buildOptimisticTrip(selectedClient, fromPlaceName, toPlaceName, tripDate, kmValue, rateValue);
+    const optimisticTrip = buildOptimisticTrip(selectedClient, fromPlaceName, toPlaceName, tripDate, kmValue, rateValue, description);
 
     setSavingTrip(true);
     setTrips((current) => [optimisticTrip, ...current]);
@@ -969,6 +995,7 @@ export function CamionesHomePage() {
     setSelectedToPlace(null);
     setKilometers("");
     setRatePerKilometer("");
+    setTripDescription("");
     setTripFilter("all");
     setTab("registro");
     setSavingTrip(false);
@@ -980,7 +1007,7 @@ export function CamionesHomePage() {
         placeName: toPlaceName,
         tripDate,
         kilometers: Number(kmValue.toFixed(2)),
-        notes: buildTripNotes(fromPlaceName, rateValue, kmValue)
+        notes: buildTripNotes(fromPlaceName, rateValue, kmValue, null, description)
       });
       setTrips((current) => current.map((trip) => (trip.id === optimisticTrip.id ? payload.trip : trip)));
       void refreshTrips();
@@ -995,6 +1022,7 @@ export function CamionesHomePage() {
       setSelectedToPlace(previousSelectedToPlace);
       setKilometers(previousKilometers);
       setRatePerKilometer(previousRatePerKilometer);
+      setTripDescription(previousTripDescription);
       setTab(previousTab);
       toast.error(error instanceof Error ? error.message : "No se pudo guardar el viaje");
     }
@@ -1007,6 +1035,7 @@ export function CamionesHomePage() {
     const placeName = tripDraftPlace.trim();
     const kilometersValue = Number(tripDraftKilometers);
     const rateValue = Number(tripDraftRatePerKilometer);
+    const description = tripDraftDescription.trim();
     const totalAmount = Number((kilometersValue * rateValue).toFixed(2));
     const collectedAmountValue = tripDraftCollectedAmount.trim() ? Number(tripDraftCollectedAmount) : 0;
 
@@ -1071,7 +1100,7 @@ export function CamionesHomePage() {
               status: tripDraftStatus,
               collectedAmount: nextCollectedAmount,
               paidAt: tripDraftStatus === "paid" ? new Date().toISOString() : null,
-              notes: buildTripNotes(fromPlaceName, rateValue, kilometersValue, nextCollectedAmount),
+              notes: buildTripNotes(fromPlaceName, rateValue, kilometersValue, nextCollectedAmount, description),
               updatedAt: new Date().toISOString()
             }
           : trip
@@ -1083,6 +1112,7 @@ export function CamionesHomePage() {
     setTripDraftPlace("");
     setTripDraftKilometers("");
     setTripDraftRatePerKilometer("");
+    setTripDraftDescription("");
     setTripDraftStatus("confirmed");
     setTripDraftCollectedAmount("");
     setSavingTripEdit(false);
@@ -1095,7 +1125,7 @@ export function CamionesHomePage() {
         kilometers: Number(kilometersValue.toFixed(2)),
         status: tripDraftStatus,
         collectedAmount: nextCollectedAmount ?? undefined,
-        notes: buildTripNotes(fromPlaceName, rateValue, kilometersValue, nextCollectedAmount)
+        notes: buildTripNotes(fromPlaceName, rateValue, kilometersValue, nextCollectedAmount, description)
       });
       void refreshTrips();
     } catch (error) {
@@ -1434,6 +1464,17 @@ export function CamionesHomePage() {
                 />
               </label>
 
+              <label style={fieldWrapStyle}>
+                <span style={fieldLabelStyle}>Descripcion</span>
+                <textarea
+                  value={tripDescription}
+                  onChange={(event) => setTripDescription(event.target.value)}
+                  placeholder="Detalle breve del viaje"
+                  rows={3}
+                  style={textAreaStyle}
+                />
+              </label>
+
               {Number.isFinite(Number(kilometers)) && Number(kilometers) > 0 && Number.isFinite(Number(ratePerKilometer)) && Number(ratePerKilometer) > 0 ? (
                 <div style={tripSummaryCardStyle}>
                   <span style={tripSummaryLabelStyle}>
@@ -1561,6 +1602,7 @@ export function CamionesHomePage() {
                       {visibleTrips.map(({ trip }) => {
                         const route = getTripRouteParts(trip);
                         const financials = getTripFinancials(trip);
+                        const tripMeta = readTripMeta(trip.notes);
 
                         return (
                           <div key={trip.id} style={tripRouteItemStyle}>
@@ -1579,6 +1621,8 @@ export function CamionesHomePage() {
                                 <span style={tripBreakdownTextStyle}>Pendiente: {formatMoneyLabel(financials.pendingAmount ?? 0)}</span>
                               </div>
                             ) : null}
+
+                            {tripMeta.description ? <p style={tripDescriptionStyle}>{tripMeta.description}</p> : null}
 
                             <div style={tripRouteItemFooterStyle}>
                               <button type="button" onClick={() => openTripDetailsModal(trip)} style={miniActionButtonStyle}>
@@ -1841,6 +1885,17 @@ export function CamionesHomePage() {
                   onChange={(event) => setTripDraftRatePerKilometer(event.target.value)}
                   placeholder="Ej: 105"
                   style={inputStyle}
+                />
+              </label>
+
+              <label style={fieldWrapStyle}>
+                <span style={fieldLabelStyle}>Descripcion</span>
+                <textarea
+                  value={tripDraftDescription}
+                  onChange={(event) => setTripDraftDescription(event.target.value)}
+                  placeholder="Detalle breve del viaje"
+                  rows={3}
+                  style={textAreaStyle}
                 />
               </label>
 
@@ -2128,6 +2183,13 @@ const inputStyle: React.CSSProperties = {
   background: "#fffaf4",
   fontSize: 17,
   boxSizing: "border-box"
+};
+
+const textAreaStyle: React.CSSProperties = {
+  ...inputStyle,
+  minHeight: 96,
+  resize: "vertical",
+  fontFamily: "inherit"
 };
 
 const readOnlyRouteInputStyle: React.CSSProperties = {
@@ -2447,6 +2509,13 @@ const tripBreakdownTextStyle: React.CSSProperties = {
   color: "#6e573f",
   fontSize: 13,
   fontWeight: 700
+};
+
+const tripDescriptionStyle: React.CSSProperties = {
+  margin: 0,
+  color: "#5d4a3e",
+  fontSize: 14,
+  lineHeight: 1.5
 };
 
 const tripMiniKmStyle: React.CSSProperties = {
