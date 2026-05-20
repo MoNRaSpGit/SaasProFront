@@ -1,8 +1,29 @@
 # Bitacora `frontend-camiones`
 
-Fecha de actualizacion: 2026-05-18
+Fecha de actualizacion: 2026-05-20
 
 ## Cambio reciente
+
+En `Registro` se simplifico la accion sobre cada viaje:
+
+- se saco el boton `Editar`
+- ahora el acceso principal queda como `Mostrar viaje`
+- ese boton abre el modal completo del viaje y desde ahi mismo se puede corregir:
+  - origen
+  - destino
+  - fecha
+  - kilometros
+  - tarifa
+  - estado
+  - cobro parcial
+
+Tambien se limpio la tarjeta resumida del viaje:
+
+- ya no repite tarifa y total en el listado expandido
+- prioriza mostrar de donde a donde va el viaje
+- el detalle completo queda concentrado dentro del modal
+
+## Cambio anterior
 
 En `Registro` los viajes ahora se agrupan por cliente y no por cliente + fecha.
 

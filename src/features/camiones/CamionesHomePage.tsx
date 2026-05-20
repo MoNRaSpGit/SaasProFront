@@ -548,7 +548,7 @@ export function CamionesHomePage() {
     setPlaceDraftName("");
   }
 
-  function openTripEditModal(trip: CamionesTrip) {
+  function openTripDetailsModal(trip: CamionesTrip) {
     const tripMeta = readTripMeta(trip.notes);
     const financials = getTripFinancials(trip);
     setTripDraftDate(trip.tripDate.includes("T") ? trip.tripDate.slice(0, 10) : trip.tripDate);
@@ -1554,7 +1554,7 @@ export function CamionesHomePage() {
                       }
                       style={groupToggleButtonStyle}
                     >
-                      {isExpanded ? "Ocultar viajes" : "Mostrar viajes"}
+                      {isExpanded ? "Ocultar viajes" : "Ver viajes"}
                     </button>
 
                     {isExpanded ? <div style={tripStackStyle}>
@@ -1566,7 +1566,6 @@ export function CamionesHomePage() {
                           <div key={trip.id} style={tripRouteItemStyle}>
                             <div style={tripRouteCellStyle}>
                               <div style={tripInlineRowStyle}>
-                                <span style={tripInlineIndexStyle}>{formatDateLabel(trip.tripDate)}</span>
                                 <div style={tripInlineRouteStyle}>
                                   <span style={tripInlinePlaceStyle}>{route.from}</span>
                                   <span style={tripRouteArrowStyle}>→</span>
@@ -1574,20 +1573,6 @@ export function CamionesHomePage() {
                                 </div>
                                 <span style={tripMiniKmStyle}>{trip.kilometers} km</span>
                               </div>
-
-                            {financials.ratePerKilometer !== null || financials.totalAmount !== null ? (
-                              <div style={tripPricingRowStyle}>
-                                {financials.ratePerKilometer !== null ? (
-                                  <span style={tripPricingLabelStyle}>Tarifa: {formatMoneyLabel(financials.ratePerKilometer)} / km</span>
-                                ) : (
-                                  <span />
-                                )}
-                                {financials.totalAmount !== null ? (
-                                  <strong style={tripPricingValueStyle}>Total: {formatMoneyLabel(financials.totalAmount)}</strong>
-                                ) : null}
-                              </div>
-                            ) : null}
-
                             {trip.status === "pending" && financials.totalAmount !== null ? (
                               <div style={tripStatusBreakdownStyle}>
                                 <span style={tripBreakdownTextStyle}>Cobrado: {formatMoneyLabel(financials.collectedAmount)}</span>
@@ -1596,8 +1581,8 @@ export function CamionesHomePage() {
                             ) : null}
 
                             <div style={tripRouteItemFooterStyle}>
-                              <button type="button" onClick={() => openTripEditModal(trip)} style={miniActionButtonStyle}>
-                                Editar
+                              <button type="button" onClick={() => openTripDetailsModal(trip)} style={miniActionButtonStyle}>
+                                Mostrar viaje
                               </button>
                               {tripFilter === "paid" && trip.status === "paid" ? (
                                 <button
@@ -1611,7 +1596,6 @@ export function CamionesHomePage() {
                               ) : null}
                               {trip.status === "paid" ? <span style={paidPillStyle}>Pago</span> : null}
                               {trip.status === "pending" ? <span style={pendingPillButtonStyle}>Pendiente</span> : null}
-                              {trip.status === "confirmed" ? <span style={confirmedPillStyle}>Confirmado</span> : null}
                               </div>
                             </div>
                           </div>
@@ -1798,7 +1782,7 @@ export function CamionesHomePage() {
         <div style={modalOverlayStyle} onClick={closeTripModal}>
           <section style={modalCardStyle} onClick={(event) => event.stopPropagation()}>
             <div style={{ display: "grid", gap: 6 }}>
-              <h3 style={{ margin: 0, fontSize: 24, color: "#2f241e" }}>Editar registro</h3>
+              <h3 style={{ margin: 0, fontSize: 24, color: "#2f241e" }}>Mostrar viaje</h3>
               <p style={{ margin: 0, color: "#68594f", lineHeight: 1.5 }}>
                 Ya queda pronta la vista para corregir un viaje cuando se cargó algo mal.
               </p>
@@ -1912,7 +1896,7 @@ export function CamionesHomePage() {
                 style={tripModalPrimaryActionButtonStyle}
                 disabled={savingTripEdit}
               >
-                {savingTripEdit ? "Guardando..." : "Guardar cambios"}
+                {savingTripEdit ? "Guardando..." : "Guardar viaje"}
               </button>
             </div>
           </section>
@@ -2418,15 +2402,6 @@ const tripInlineRowStyle: React.CSSProperties = {
   minWidth: 0
 };
 
-const tripInlineIndexStyle: React.CSSProperties = {
-  fontSize: 12,
-  fontWeight: 800,
-  letterSpacing: "0.08em",
-  textTransform: "uppercase",
-  color: "#8a745d",
-  whiteSpace: "nowrap"
-};
-
 const tripInlineRouteStyle: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
@@ -2458,26 +2433,6 @@ const tripRouteItemFooterStyle: React.CSSProperties = {
   justifyContent: "space-between",
   gap: 12,
   flexWrap: "wrap"
-};
-
-const tripPricingRowStyle: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: 10,
-  flexWrap: "wrap"
-};
-
-const tripPricingLabelStyle: React.CSSProperties = {
-  color: "#7b5a31",
-  fontSize: 13,
-  fontWeight: 700
-};
-
-const tripPricingValueStyle: React.CSSProperties = {
-  color: "#4f3828",
-  fontSize: 15,
-  fontWeight: 800
 };
 
 const tripStatusBreakdownStyle: React.CSSProperties = {
@@ -2550,18 +2505,6 @@ const pendingPillButtonStyle: React.CSSProperties = {
   fontWeight: 800,
   boxShadow: "0 8px 16px rgba(188, 146, 43, 0.18)",
   cursor: "pointer"
-};
-
-const confirmedPillStyle: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  padding: "10px 14px",
-  borderRadius: 999,
-  border: "1px solid rgba(104, 89, 79, 0.18)",
-  background: "#efe2d0",
-  color: "#5c493d",
-  fontWeight: 800
 };
 
 const tripPendingMetaStyle: React.CSSProperties = {
