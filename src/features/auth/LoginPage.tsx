@@ -1,7 +1,7 @@
 import { FormEvent, useCallback, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { API_BASE_URL } from "../../shared/config/api";
-import { saveSession } from "./auth.client";
+import { clearRememberedAccount, getRememberedAccount, saveSession, setRememberedAccount } from "./auth.client";
 import { AuthSession } from "./auth.types";
 
 type LoginResponse = AuthSession;
@@ -25,8 +25,9 @@ const QUICK_ACCESS_ACCOUNTS: QuickAccessAccount[] = [
 export function LoginPage() {
   const navigate = useNavigate();
   const [apiError, setApiError] = useState<string | null>(null);
-  const [account, setAccount] = useState("");
+  const [account, setAccount] = useState(() => getRememberedAccount());
   const [password, setPassword] = useState("");
+  const [rememberSession, setRememberSession] = useState(() => Boolean(getRememberedAccount()));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeAccountId, setActiveAccountId] = useState<string | null>(null);
   const prefetchedSessionsRef = useRef<Record<string, LoginResponse | null>>({});
@@ -75,7 +76,7 @@ export function LoginPage() {
   );
 
   const persistSessionAndGo = useCallback(
-    (data: LoginResponse) => {
+    (data: LoginResponse, options?: { persistence?: "local" | "session" }) => {
       const camionesOnlySession: LoginResponse = {
         ...data,
         tenantContext: data.tenantContext
@@ -86,7 +87,7 @@ export function LoginPage() {
           : data.tenantContext
       };
 
-      saveSession(camionesOnlySession);
+      saveSession(camionesOnlySession, options);
       navigate("/camiones");
     },
     [navigate]
@@ -98,11 +99,19 @@ export function LoginPage() {
     setIsSubmitting(true);
 
     try {
+      if (rememberSession) {
+        setRememberedAccount(account);
+      } else {
+        clearRememberedAccount();
+      }
+
       const data = await performLoginRequest({
         identifier: account.trim(),
         password
       });
-      persistSessionAndGo(data);
+      persistSessionAndGo(data, {
+        persistence: rememberSession ? "local" : "session"
+      });
     } catch (error) {
       setApiError(error instanceof Error ? error.message : "No se pudo conectar al backend.");
     } finally {
@@ -163,6 +172,16 @@ export function LoginPage() {
               required
               style={inputStyle}
             />
+          </label>
+
+          <label style={rememberRowStyle}>
+            <input
+              type="checkbox"
+              checked={rememberSession}
+              onChange={(event) => setRememberSession(event.target.checked)}
+              style={checkboxStyle}
+            />
+            <span style={rememberLabelStyle}>Recordarme en este dispositivo</span>
           </label>
 
           <button type="submit" disabled={isSubmitting || activeAccountId !== null} style={isSubmitting ? submitButtonActiveStyle : submitButtonStyle}>
@@ -268,6 +287,25 @@ const inputStyle: React.CSSProperties = {
   lineHeight: 1.2,
   outline: "none",
   boxShadow: "inset 0 1px 2px rgba(47, 36, 30, 0.04)"
+};
+
+const rememberRowStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  color: "#5f4b3d"
+};
+
+const checkboxStyle: React.CSSProperties = {
+  width: 16,
+  height: 16,
+  margin: 0,
+  accentColor: "#2b7a57"
+};
+
+const rememberLabelStyle: React.CSSProperties = {
+  fontSize: 14,
+  fontWeight: 600
 };
 
 const submitButtonStyle: React.CSSProperties = {

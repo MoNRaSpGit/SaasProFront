@@ -4,16 +4,23 @@ import { API_BASE_URL } from "../../shared/config/api";
 const ACCESS_TOKEN_KEY = "frontend-camiones.access_token";
 const REFRESH_TOKEN_KEY = "frontend-camiones.refresh_token";
 const USER_KEY = "frontend-camiones.user";
+const REMEMBERED_ACCOUNT_KEY = "frontend-camiones.remembered_account";
 const DEMO_SESSION_PREFIX = "demo-";
 const DEMO_AUTH_ENABLED = import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEMO_AUTH === "true";
 const REQUIRED_MODULE = "camiones";
 
-export function saveSession(session: AuthSession) {
-  const scopedSession = normalizeCamionesSession(session);
+type SessionPersistence = "local" | "session";
 
-  localStorage.setItem(ACCESS_TOKEN_KEY, session.tokens.accessToken);
-  localStorage.setItem(REFRESH_TOKEN_KEY, session.tokens.refreshToken);
-  localStorage.setItem(
+export function saveSession(session: AuthSession, options?: { persistence?: SessionPersistence }) {
+  const scopedSession = normalizeCamionesSession(session);
+  const persistence = options?.persistence ?? "local";
+  const storage = persistence === "local" ? localStorage : sessionStorage;
+
+  clearSession();
+
+  storage.setItem(ACCESS_TOKEN_KEY, session.tokens.accessToken);
+  storage.setItem(REFRESH_TOKEN_KEY, session.tokens.refreshToken);
+  storage.setItem(
     USER_KEY,
     JSON.stringify({
       ...scopedSession.user,
@@ -25,7 +32,7 @@ export function saveSession(session: AuthSession) {
 }
 
 export function getStoredUser(): StoredAuthUser | null {
-  const raw = localStorage.getItem(USER_KEY);
+  const raw = getSessionStorageItem(USER_KEY);
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw) as StoredAuthUser;
@@ -36,11 +43,11 @@ export function getStoredUser(): StoredAuthUser | null {
 }
 
 export function getAccessToken() {
-  return localStorage.getItem(ACCESS_TOKEN_KEY);
+  return getSessionStorageItem(ACCESS_TOKEN_KEY);
 }
 
 export function getRefreshToken() {
-  return localStorage.getItem(REFRESH_TOKEN_KEY);
+  return getSessionStorageItem(REFRESH_TOKEN_KEY);
 }
 
 export function isDemoAuthEnabled() {
@@ -89,6 +96,9 @@ export function clearSession() {
   localStorage.removeItem(ACCESS_TOKEN_KEY);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
+  sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+  sessionStorage.removeItem(REFRESH_TOKEN_KEY);
+  sessionStorage.removeItem(USER_KEY);
 }
 
 export async function fetchWithAuth(input: string, init?: RequestInit) {
@@ -140,4 +150,27 @@ function isSessionCompatibleWithCurrentTenant(session: AuthSession, currentUser:
   }
 
   return session.tenantContext?.tenant.id === currentUser.tenantContext.tenant.id;
+}
+
+function getSessionStorageItem(key: string) {
+  return localStorage.getItem(key) ?? sessionStorage.getItem(key);
+}
+
+export function getRememberedAccount() {
+  return localStorage.getItem(REMEMBERED_ACCOUNT_KEY) ?? "";
+}
+
+export function setRememberedAccount(account: string) {
+  const normalized = account.trim();
+
+  if (!normalized) {
+    localStorage.removeItem(REMEMBERED_ACCOUNT_KEY);
+    return;
+  }
+
+  localStorage.setItem(REMEMBERED_ACCOUNT_KEY, normalized);
+}
+
+export function clearRememberedAccount() {
+  localStorage.removeItem(REMEMBERED_ACCOUNT_KEY);
 }

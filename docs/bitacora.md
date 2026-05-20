@@ -4,6 +4,22 @@ Fecha de actualizacion: 2026-05-20
 
 ## Cambio reciente
 
+En el login de `camiones` se agrega opcion `Recordarme`.
+
+Comportamiento:
+
+- si el usuario marca `Recordarme`, la sesion queda persistida en `localStorage`
+- si no la marca, la sesion vive solo durante la sesion del navegador
+- la cuenta tambien puede quedar recordada en el dispositivo
+- no se guarda la contrasena en texto plano
+
+Objetivo:
+
+- evitar que el cliente tenga que loguearse cada vez
+- mantener un nivel razonable de seguridad en el dispositivo
+
+## Cambio reciente
+
 La pantalla de acceso deja de depender solo de botones con credenciales precargadas.
 
 Queda asi:
