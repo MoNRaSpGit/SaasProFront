@@ -1,66 +1,81 @@
-import { useCallback, useRef, useState } from "react";
+import { FormEvent, useCallback, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { API_BASE_URL } from "../../shared/config/api";
-import { BuildMetaCard } from "../../shared/components/BuildMetaCard";
 import { saveSession } from "./auth.client";
 import { AuthSession } from "./auth.types";
 
 type LoginResponse = AuthSession;
 
-const CAMIONES_DEMO_ACCESS = {
-  email: "camiones.demo@saaspro.com",
-  password: "camiones123"
+type QuickAccessAccount = {
+  id: string;
+  label: string;
+  identifier: string;
+  password: string;
 };
+
+const QUICK_ACCESS_ACCOUNTS: QuickAccessAccount[] = [
+  {
+    id: "guest",
+    label: "Entrar como invitado",
+    identifier: "camiones.video@saaspro.com",
+    password: "camiones123"
+  }
+];
 
 export function LoginPage() {
   const navigate = useNavigate();
   const [apiError, setApiError] = useState<string | null>(null);
+  const [account, setAccount] = useState("");
+  const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [prefetchedSession, setPrefetchedSession] = useState<LoginResponse | null>(null);
-  const loginPromiseRef = useRef<Promise<LoginResponse> | null>(null);
+  const [activeAccountId, setActiveAccountId] = useState<string | null>(null);
+  const prefetchedSessionsRef = useRef<Record<string, LoginResponse | null>>({});
+  const loginPromisesRef = useRef<Record<string, Promise<LoginResponse> | null>>({});
 
-  const performLoginRequest = useCallback(async () => {
+  const performLoginRequest = useCallback(async (credentials: { identifier: string; password: string }) => {
     const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(CAMIONES_DEMO_ACCESS)
+      body: JSON.stringify({
+        identifier: credentials.identifier,
+        password: credentials.password
+      })
     });
 
-    const payload = (await response.json()) as LoginResponse | { message?: string | string[] };
+    const responsePayload = (await response.json()) as LoginResponse | { message?: string | string[] };
     if (!response.ok) {
-      const rawMessage = "message" in payload ? payload.message : null;
+      const rawMessage = "message" in responsePayload ? responsePayload.message : null;
       const message = Array.isArray(rawMessage) ? rawMessage.join(", ") : rawMessage || "Error al iniciar sesion";
       throw new Error(message);
     }
 
-    return payload as LoginResponse;
+    return responsePayload as LoginResponse;
   }, []);
 
-  const startLoginPrefetch = useCallback(() => {
-    if (loginPromiseRef.current || prefetchedSession) {
-      return loginPromiseRef.current;
-    }
+  const startLoginPrefetch = useCallback(
+    (account: QuickAccessAccount) => {
+      if (loginPromisesRef.current[account.id] || prefetchedSessionsRef.current[account.id]) {
+        return loginPromisesRef.current[account.id];
+      }
 
-    const promise = performLoginRequest()
-      .then((session) => {
-        setPrefetchedSession(session);
-        return session;
-      })
-      .catch((error) => {
-        loginPromiseRef.current = null;
-        throw error;
-      });
+      const promise = performLoginRequest({ identifier: account.identifier, password: account.password })
+        .then((session) => {
+          prefetchedSessionsRef.current[account.id] = session;
+          return session;
+        })
+        .catch((error) => {
+          loginPromisesRef.current[account.id] = null;
+          throw error;
+        });
 
-    loginPromiseRef.current = promise;
-    return promise;
-  }, [performLoginRequest, prefetchedSession]);
+      loginPromisesRef.current[account.id] = promise;
+      return promise;
+    },
+    [performLoginRequest]
+  );
 
-  const handleLogin = async () => {
-    setApiError(null);
-    setIsSubmitting(true);
-
-    try {
-      const data = prefetchedSession ?? (await (loginPromiseRef.current ?? startLoginPrefetch() ?? performLoginRequest()));
+  const persistSessionAndGo = useCallback(
+    (data: LoginResponse) => {
       const camionesOnlySession: LoginResponse = {
         ...data,
         tenantContext: data.tenantContext
@@ -73,12 +88,47 @@ export function LoginPage() {
 
       saveSession(camionesOnlySession);
       navigate("/camiones");
+    },
+    [navigate]
+  );
+
+  const handleClassicLogin = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setApiError(null);
+    setIsSubmitting(true);
+
+    try {
+      const data = await performLoginRequest({
+        identifier: account.trim(),
+        password
+      });
+      persistSessionAndGo(data);
     } catch (error) {
-      loginPromiseRef.current = null;
-      setPrefetchedSession(null);
       setApiError(error instanceof Error ? error.message : "No se pudo conectar al backend.");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleLogin = async (account: QuickAccessAccount) => {
+    setApiError(null);
+    setActiveAccountId(account.id);
+
+    try {
+      const data =
+        prefetchedSessionsRef.current[account.id] ??
+        (await (
+          loginPromisesRef.current[account.id] ??
+          startLoginPrefetch(account) ??
+          performLoginRequest({ identifier: account.identifier, password: account.password })
+        ));
+      persistSessionAndGo(data);
+    } catch (error) {
+      loginPromisesRef.current[account.id] = null;
+      prefetchedSessionsRef.current[account.id] = null;
+      setApiError(error instanceof Error ? error.message : "No se pudo conectar al backend.");
+    } finally {
+      setActiveAccountId(null);
     }
   };
 
@@ -90,21 +140,57 @@ export function LoginPage() {
           <h1 style={titleStyle}>Login</h1>
         </div>
 
-        <button
-          type="button"
-          onMouseEnter={() => void startLoginPrefetch()}
-          onFocus={() => void startLoginPrefetch()}
-          onPointerDown={() => void startLoginPrefetch()}
-          onClick={() => void handleLogin()}
-          disabled={isSubmitting}
-          style={submitButtonStyle}
-        >
-          {isSubmitting ? "Entrando..." : "Login"}
-        </button>
+        <form style={loginFormStyle} onSubmit={handleClassicLogin}>
+          <label style={fieldStyle}>
+            <span style={fieldLabelStyle}>Cuenta</span>
+            <input
+              type="text"
+              value={account}
+              onChange={(event) => setAccount(event.target.value)}
+              autoComplete="username"
+              required
+              style={inputStyle}
+            />
+          </label>
+
+          <label style={fieldStyle}>
+            <span style={fieldLabelStyle}>Contrasena</span>
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              autoComplete="current-password"
+              required
+              style={inputStyle}
+            />
+          </label>
+
+          <button type="submit" disabled={isSubmitting || activeAccountId !== null} style={isSubmitting ? submitButtonActiveStyle : submitButtonStyle}>
+            <span style={buttonTitleStyle}>{isSubmitting ? "Entrando..." : "Entrar"}</span>
+          </button>
+        </form>
+
+        <div style={quickAccessListStyle}>
+          {QUICK_ACCESS_ACCOUNTS.map((account) => {
+            const isQuickSubmitting = activeAccountId === account.id;
+            return (
+              <button
+                key={account.id}
+                type="button"
+                onMouseEnter={() => void startLoginPrefetch(account)}
+                onFocus={() => void startLoginPrefetch(account)}
+                onPointerDown={() => void startLoginPrefetch(account)}
+                onClick={() => void handleLogin(account)}
+                disabled={activeAccountId !== null || isSubmitting}
+                style={isQuickSubmitting ? secondaryButtonActiveStyle : secondaryButtonStyle}
+              >
+                <span style={buttonTitleStyle}>{isQuickSubmitting ? "Entrando..." : account.label}</span>
+              </button>
+            );
+          })}
+        </div>
 
         {apiError ? <div style={errorBoxStyle}>{apiError}</div> : null}
-
-        {!isSubmitting ? <BuildMetaCard compact /> : null}
       </section>
     </main>
   );
@@ -148,8 +234,44 @@ const titleStyle: React.CSSProperties = {
   color: "#2f241e"
 };
 
+const quickAccessListStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 12
+};
+
+const loginFormStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 12
+};
+
+const fieldStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 8
+};
+
+const fieldLabelStyle: React.CSSProperties = {
+  fontSize: 13,
+  fontWeight: 800,
+  color: "#665342"
+};
+
+const inputStyle: React.CSSProperties = {
+  boxSizing: "border-box",
+  width: "100%",
+  minHeight: 52,
+  padding: "12px 14px",
+  borderRadius: 16,
+  border: "1px solid #d6ccbe",
+  background: "#fffcf7",
+  color: "#2f241e",
+  fontSize: 16,
+  lineHeight: 1.2,
+  outline: "none",
+  boxShadow: "inset 0 1px 2px rgba(47, 36, 30, 0.04)"
+};
+
 const submitButtonStyle: React.CSSProperties = {
-  minHeight: 56,
+  minHeight: 72,
   padding: "14px 16px",
   borderRadius: 18,
   border: "1px solid rgba(16, 74, 53, 0.2)",
@@ -158,7 +280,43 @@ const submitButtonStyle: React.CSSProperties = {
   fontWeight: 800,
   fontSize: 18,
   cursor: "pointer",
-  boxShadow: "0 16px 28px rgba(43, 122, 87, 0.22)"
+  boxShadow: "0 16px 28px rgba(43, 122, 87, 0.22)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  textAlign: "center"
+};
+
+const submitButtonActiveStyle: React.CSSProperties = {
+  ...submitButtonStyle,
+  background: "#215f44"
+};
+
+const secondaryButtonStyle: React.CSSProperties = {
+  minHeight: 72,
+  padding: "14px 16px",
+  borderRadius: 18,
+  border: "1px solid #d8d2c8",
+  background: "#f5efe6",
+  color: "#2f241e",
+  fontWeight: 800,
+  fontSize: 18,
+  cursor: "pointer",
+  boxShadow: "0 12px 24px rgba(76, 66, 58, 0.08)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  textAlign: "center"
+};
+
+const secondaryButtonActiveStyle: React.CSSProperties = {
+  ...secondaryButtonStyle,
+  background: "#e7ddd0"
+};
+
+const buttonTitleStyle: React.CSSProperties = {
+  fontSize: 18,
+  fontWeight: 800
 };
 
 const errorBoxStyle: React.CSSProperties = {

@@ -12,7 +12,10 @@ type Props = {
 
 export function ProtectedRoute({ children, requiredModule, requireSaasAdmin }: Props) {
   const token = getAccessToken();
-  if (!token) {
+  const user = getStoredUser();
+
+  if (!token || !user) {
+    clearSession();
     return <Navigate to="/login" replace />;
   }
 
@@ -20,8 +23,6 @@ export function ProtectedRoute({ children, requiredModule, requireSaasAdmin }: P
     clearSession();
     return <Navigate to="/login" replace />;
   }
-
-  const user = getStoredUser();
 
   if (requireSaasAdmin && !userCanAccessSaasAdmin(user)) {
     return <Navigate to="/dashboard" replace />;

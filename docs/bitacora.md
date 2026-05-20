@@ -4,6 +4,27 @@ Fecha de actualizacion: 2026-05-20
 
 ## Cambio reciente
 
+La pantalla de acceso deja de depender solo de botones con credenciales precargadas.
+
+Queda asi:
+
+- login clasico por `Cuenta` y `Contrasena`
+- acceso principal pensado para clientes reales como `lamilagrosa`
+- boton secundario `Entrar como invitado`
+
+Regla de este corte:
+
+- `Entrar` lleva al tenant real asignado al usuario autenticado
+- `Entrar como invitado` mantiene el tenant limpio de demo para grabaciones y pruebas
+
+Tambien se endurece la sesion del frontend:
+
+- almacenamiento local con namespace propio de `frontend-camiones`
+- rechazo de sesiones que no pertenezcan a `camiones`
+- rechazo de refresh que vuelva con otro tenant distinto al que inicio sesion
+
+## Cambio reciente
+
 En `Registro` se simplifico la accion sobre cada viaje:
 
 - se saco el boton `Editar`

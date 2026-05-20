@@ -1,21 +1,25 @@
 import { AuthSession, AuthTokens, StoredAuthUser } from "./auth.types";
 import { API_BASE_URL } from "../../shared/config/api";
 
-const ACCESS_TOKEN_KEY = "saaspro_access_token";
-const REFRESH_TOKEN_KEY = "saaspro_refresh_token";
-const USER_KEY = "saaspro_user";
+const ACCESS_TOKEN_KEY = "frontend-camiones.access_token";
+const REFRESH_TOKEN_KEY = "frontend-camiones.refresh_token";
+const USER_KEY = "frontend-camiones.user";
 const DEMO_SESSION_PREFIX = "demo-";
 const DEMO_AUTH_ENABLED = import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEMO_AUTH === "true";
+const REQUIRED_MODULE = "camiones";
 
 export function saveSession(session: AuthSession) {
+  const scopedSession = normalizeCamionesSession(session);
+
   localStorage.setItem(ACCESS_TOKEN_KEY, session.tokens.accessToken);
   localStorage.setItem(REFRESH_TOKEN_KEY, session.tokens.refreshToken);
   localStorage.setItem(
     USER_KEY,
     JSON.stringify({
-      ...session.user,
-      tenantContext: session.tenantContext,
-      isDemoSession: session.isDemoSession === true
+      ...scopedSession.user,
+      tenantContext: scopedSession.tenantContext,
+      isDemoSession: scopedSession.isDemoSession === true,
+      sessionScope: "camiones"
     } satisfies StoredAuthUser)
   );
 }
@@ -24,7 +28,8 @@ export function getStoredUser(): StoredAuthUser | null {
   const raw = localStorage.getItem(USER_KEY);
   if (!raw) return null;
   try {
-    return JSON.parse(raw) as StoredAuthUser;
+    const parsed = JSON.parse(raw) as StoredAuthUser;
+    return isCamionesStoredUser(parsed) ? parsed : null;
   } catch {
     return null;
   }
@@ -49,6 +54,7 @@ export function isDemoToken(token: string | null) {
 export async function refreshSession(): Promise<AuthTokens | null> {
   const refreshToken = getRefreshToken();
   if (!refreshToken) return null;
+  const currentUser = getStoredUser();
 
   const response = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
     method: "POST",
@@ -58,6 +64,11 @@ export async function refreshSession(): Promise<AuthTokens | null> {
 
   if (!response.ok) return null;
   const payload = (await response.json()) as AuthSession;
+  if (!isSessionCompatibleWithCurrentTenant(payload, currentUser)) {
+    clearSession();
+    return null;
+  }
+
   saveSession(payload);
   return payload.tokens;
 }
@@ -100,4 +111,33 @@ export async function fetchWithAuth(input: string, init?: RequestInit) {
   headers.set("Authorization", `Bearer ${refreshed.accessToken}`);
   response = await doRequest();
   return response;
+}
+
+function normalizeCamionesSession(session: AuthSession) {
+  const modules = session.tenantContext?.modules || [];
+  if (!modules.includes(REQUIRED_MODULE)) {
+    throw new Error("La sesion no tiene acceso al modulo camiones.");
+  }
+
+  return {
+    ...session,
+    tenantContext: session.tenantContext
+      ? {
+          ...session.tenantContext,
+          modules: [REQUIRED_MODULE]
+        }
+      : session.tenantContext
+  };
+}
+
+function isCamionesStoredUser(user: StoredAuthUser | null): user is StoredAuthUser {
+  return Boolean(user?.tenantContext?.modules?.includes(REQUIRED_MODULE) && user.sessionScope === "camiones");
+}
+
+function isSessionCompatibleWithCurrentTenant(session: AuthSession, currentUser: StoredAuthUser | null) {
+  if (!currentUser?.tenantContext?.tenant.id) {
+    return true;
+  }
+
+  return session.tenantContext?.tenant.id === currentUser.tenantContext.tenant.id;
 }
