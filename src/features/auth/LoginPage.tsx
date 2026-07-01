@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useRef, useState } from "react";
+import { FormEvent, useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { API_BASE_URL } from "../../shared/config/api";
 import { clearRememberedAccount, getRememberedAccount, saveSession, setRememberedAccount } from "./auth.client";
@@ -10,15 +10,13 @@ type QuickAccessAccount = {
   id: string;
   label: string;
   identifier: string;
-  password: string;
 };
 
 const QUICK_ACCESS_ACCOUNTS: QuickAccessAccount[] = [
   {
     id: "guest",
-    label: "Entrar como invitado",
-    identifier: "camiones.video@saaspro.com",
-    password: "camiones123"
+    label: "Usar invitado",
+    identifier: "camiones.video@saaspro.com"
   }
 ];
 
@@ -29,9 +27,6 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [rememberSession, setRememberSession] = useState(() => Boolean(getRememberedAccount()));
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activeAccountId, setActiveAccountId] = useState<string | null>(null);
-  const prefetchedSessionsRef = useRef<Record<string, LoginResponse | null>>({});
-  const loginPromisesRef = useRef<Record<string, Promise<LoginResponse> | null>>({});
 
   const performLoginRequest = useCallback(async (credentials: { identifier: string; password: string }) => {
     const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
@@ -52,28 +47,6 @@ export function LoginPage() {
 
     return responsePayload as LoginResponse;
   }, []);
-
-  const startLoginPrefetch = useCallback(
-    (account: QuickAccessAccount) => {
-      if (loginPromisesRef.current[account.id] || prefetchedSessionsRef.current[account.id]) {
-        return loginPromisesRef.current[account.id];
-      }
-
-      const promise = performLoginRequest({ identifier: account.identifier, password: account.password })
-        .then((session) => {
-          prefetchedSessionsRef.current[account.id] = session;
-          return session;
-        })
-        .catch((error) => {
-          loginPromisesRef.current[account.id] = null;
-          throw error;
-        });
-
-      loginPromisesRef.current[account.id] = promise;
-      return promise;
-    },
-    [performLoginRequest]
-  );
 
   const persistSessionAndGo = useCallback(
     (data: LoginResponse, options?: { persistence?: "local" | "session" }) => {
@@ -116,28 +89,6 @@ export function LoginPage() {
       setApiError(error instanceof Error ? error.message : "No se pudo conectar al backend.");
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  const handleLogin = async (account: QuickAccessAccount) => {
-    setApiError(null);
-    setActiveAccountId(account.id);
-
-    try {
-      const data =
-        prefetchedSessionsRef.current[account.id] ??
-        (await (
-          loginPromisesRef.current[account.id] ??
-          startLoginPrefetch(account) ??
-          performLoginRequest({ identifier: account.identifier, password: account.password })
-        ));
-      persistSessionAndGo(data);
-    } catch (error) {
-      loginPromisesRef.current[account.id] = null;
-      prefetchedSessionsRef.current[account.id] = null;
-      setApiError(error instanceof Error ? error.message : "No se pudo conectar al backend.");
-    } finally {
-      setActiveAccountId(null);
     }
   };
 
@@ -184,26 +135,26 @@ export function LoginPage() {
             <span style={rememberLabelStyle}>Recordarme en este dispositivo</span>
           </label>
 
-          <button type="submit" disabled={isSubmitting || activeAccountId !== null} style={isSubmitting ? submitButtonActiveStyle : submitButtonStyle}>
+          <button type="submit" disabled={isSubmitting} style={isSubmitting ? submitButtonActiveStyle : submitButtonStyle}>
             <span style={buttonTitleStyle}>{isSubmitting ? "Entrando..." : "Entrar"}</span>
           </button>
         </form>
 
         <div style={quickAccessListStyle}>
           {QUICK_ACCESS_ACCOUNTS.map((account) => {
-            const isQuickSubmitting = activeAccountId === account.id;
             return (
               <button
                 key={account.id}
                 type="button"
-                onMouseEnter={() => void startLoginPrefetch(account)}
-                onFocus={() => void startLoginPrefetch(account)}
-                onPointerDown={() => void startLoginPrefetch(account)}
-                onClick={() => void handleLogin(account)}
-                disabled={activeAccountId !== null || isSubmitting}
-                style={isQuickSubmitting ? secondaryButtonActiveStyle : secondaryButtonStyle}
+                onClick={() => {
+                  setAccount(account.identifier);
+                  setPassword("");
+                  setApiError(null);
+                }}
+                disabled={isSubmitting}
+                style={secondaryButtonStyle}
               >
-                <span style={buttonTitleStyle}>{isQuickSubmitting ? "Entrando..." : account.label}</span>
+                <span style={buttonTitleStyle}>{account.label}</span>
               </button>
             );
           })}
