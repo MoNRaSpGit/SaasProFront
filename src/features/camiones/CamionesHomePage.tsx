@@ -17,7 +17,7 @@ import {
 } from "./camiones.client";
 import { CamionesClient, CamionesPlace, CamionesTrip } from "./camiones.types";
 
-type CamionesTab = "cliente" | "viaje" | "registro" | "localidad";
+type CamionesTab = "cliente" | "viaje" | "registro" | "localidad" | "panel";
 type ClientModalState = { mode: "create" | "edit"; clientId: number | null } | null;
 type PlaceModalState = { mode: "create" | "edit"; placeId: number | null } | null;
 type TripModalState = { tripId: number } | null;
@@ -188,6 +188,7 @@ function getTripFinancials(trip: CamionesTrip) {
 export function CamionesHomePage() {
   const CLIENTS_PAGE_SIZE = 3;
   const GROUP_TRIPS_PAGE_SIZE = 3;
+  const DAYS_PAGE_SIZE = 7;
   const showLegacyRouteInputs = false;
   const clientInputRef = useRef<HTMLInputElement | null>(null);
   const placeInputRef = useRef<HTMLInputElement | null>(null);
@@ -242,6 +243,7 @@ export function CamionesHomePage() {
   const [tripDeleteConfirmState, setTripDeleteConfirmState] = useState<TripDeleteConfirmState>(null);
   const [visibleTripsByGroup, setVisibleTripsByGroup] = useState<Record<string, number>>({});
   const [expandedTripGroups, setExpandedTripGroups] = useState<Record<string, boolean>>({});
+  const [visibleDaysCount, setVisibleDaysCount] = useState(DAYS_PAGE_SIZE);
   const routePickerOpenField: RouteField | null = null;
 
   function getTempId() {
@@ -390,7 +392,7 @@ export function CamionesHomePage() {
       placeInputRef.current?.focus();
     }
 
-    if (tab === "registro") {
+    if (tab === "registro" || tab === "panel") {
       void ensureTripsLoaded();
     }
 
@@ -516,6 +518,75 @@ export function CamionesHomePage() {
   const visibleGroupedTrips = useMemo(() => {
     return groupedTrips;
   }, [groupedTrips]);
+
+  // Panel de control (24/10/2026, pedido explicito): resumen de toda la
+  // actividad cargada -- plata, kilometros, viajes y un desglose diario.
+  // Se excluyen los cancelados, se incluyen confirmados/pendientes/pagos
+  // (igual criterio que usa "Registro" para contar lo que realmente paso).
+  const dashboard = useMemo(() => {
+    const activeTrips = trips.filter((trip) => trip.status !== "cancelled");
+    let totalKilometers = 0;
+    let totalAmount = 0;
+    let collectedAmountSum = 0;
+    let pendingAmountSum = 0;
+    const amountByClient = new Map<string, number>();
+    const tripsByPlace = new Map<string, number>();
+    const byDay = new Map<
+      string,
+      { date: string; trips: number; kilometers: number; amount: number; collected: number; pending: number }
+    >();
+
+    for (const trip of activeTrips) {
+      const financials = getTripFinancials(trip);
+      const amount = financials.totalAmount ?? 0;
+      const pending = financials.pendingAmount ?? 0;
+
+      totalKilometers += trip.kilometers;
+      totalAmount += amount;
+      collectedAmountSum += financials.collectedAmount;
+      pendingAmountSum += pending;
+
+      amountByClient.set(trip.clientName, (amountByClient.get(trip.clientName) ?? 0) + amount);
+      tripsByPlace.set(trip.place, (tripsByPlace.get(trip.place) ?? 0) + 1);
+
+      const dayKey = trip.tripDate.includes("T") ? trip.tripDate.slice(0, 10) : trip.tripDate;
+      const existingDay = byDay.get(dayKey);
+      if (existingDay) {
+        existingDay.trips += 1;
+        existingDay.kilometers += trip.kilometers;
+        existingDay.amount += amount;
+        existingDay.collected += financials.collectedAmount;
+        existingDay.pending += pending;
+      } else {
+        byDay.set(dayKey, {
+          date: dayKey,
+          trips: 1,
+          kilometers: trip.kilometers,
+          amount,
+          collected: financials.collectedAmount,
+          pending
+        });
+      }
+    }
+
+    const topClientEntry = [...amountByClient.entries()].sort((left, right) => right[1] - left[1])[0];
+    const topPlaceEntry = [...tripsByPlace.entries()].sort((left, right) => right[1] - left[1])[0];
+    const days = [...byDay.values()].sort((left, right) => (left.date < right.date ? 1 : -1));
+
+    return {
+      tripsCount: activeTrips.length,
+      totalKilometers,
+      totalAmount,
+      collectedAmount: collectedAmountSum,
+      pendingAmount: pendingAmountSum,
+      avgAmountPerTrip: activeTrips.length ? totalAmount / activeTrips.length : 0,
+      avgKmPerTrip: activeTrips.length ? totalKilometers / activeTrips.length : 0,
+      avgRatePerKm: totalKilometers > 0 ? totalAmount / totalKilometers : 0,
+      topClient: topClientEntry ? { name: topClientEntry[0], amount: topClientEntry[1] } : null,
+      topPlace: topPlaceEntry ? { name: topPlaceEntry[0], count: topPlaceEntry[1] } : null,
+      days
+    };
+  }, [trips]);
 
   function clearTripForm() {
     setTripDate(getTodayDate());
@@ -1189,6 +1260,9 @@ export function CamionesHomePage() {
           <button type="button" onClick={() => setTab("registro")} style={tab === "registro" ? activeTabStyle : tabStyle}>
             Registro
           </button>
+          <button type="button" onClick={() => setTab("panel")} style={tab === "panel" ? activeTabStyle : tabStyle}>
+            Panel
+          </button>
         </section>
 
         {tab === "cliente" ? (
@@ -1495,6 +1569,116 @@ export function CamionesHomePage() {
                 {savingTrip ? "Guardando..." : "Guardar"}
               </button>
             </div>
+          </section>
+        ) : null}
+
+        {tab === "panel" ? (
+          <section style={panelStyle}>
+            <div style={{ display: "grid", gap: 8 }}>
+              <h2 style={{ margin: 0, fontSize: 24, color: "#2f241e" }}>Panel de control</h2>
+              <p style={{ margin: 0, color: "#68594f", lineHeight: 1.5 }}>
+                Resumen de toda la actividad cargada (viajes confirmados, pendientes y pagos).
+              </p>
+            </div>
+
+            {tripsLoading && !tripsLoaded ? (
+              <div style={{ marginTop: 16 }}>
+                <div style={emptyBoxStyle}>Cargando panel...</div>
+              </div>
+            ) : dashboard.tripsCount === 0 ? (
+              <div style={{ marginTop: 16 }}>
+                <div style={emptyBoxStyle}>Todavia no hay viajes cargados.</div>
+              </div>
+            ) : (
+              <div style={{ display: "grid", gap: 18, marginTop: 16 }}>
+                <div style={dashboardStatsGridStyle}>
+                  <div style={dashboardStatCardStyle}>
+                    <span style={tripTotalLabelStyle}>Facturado</span>
+                    <strong style={tripMoneyStyle}>{formatMoneyLabel(dashboard.totalAmount)}</strong>
+                  </div>
+                  <div style={dashboardStatCardStyle}>
+                    <span style={tripTotalLabelStyle}>Cobrado</span>
+                    <strong style={tripMoneyStyle}>{formatMoneyLabel(dashboard.collectedAmount)}</strong>
+                  </div>
+                  <div style={dashboardStatCardStyle}>
+                    <span style={tripTotalLabelStyle}>Pendiente de cobro</span>
+                    <strong style={tripMoneyStyle}>{formatMoneyLabel(dashboard.pendingAmount)}</strong>
+                  </div>
+                  <div style={dashboardStatCardStyle}>
+                    <span style={tripTotalLabelStyle}>Kilometros</span>
+                    <strong style={tripKmStyle}>{dashboard.totalKilometers.toFixed(0)} km</strong>
+                  </div>
+                  <div style={dashboardStatCardStyle}>
+                    <span style={tripTotalLabelStyle}>Viajes</span>
+                    <strong style={tripKmStyle}>{dashboard.tripsCount}</strong>
+                  </div>
+                  <div style={dashboardStatCardStyle}>
+                    <span style={tripTotalLabelStyle}>Promedio x viaje</span>
+                    <strong style={tripMoneyStyle}>{formatMoneyLabel(dashboard.avgAmountPerTrip)}</strong>
+                    <span style={tripBreakdownTextStyle}>{dashboard.avgKmPerTrip.toFixed(0)} km promedio</span>
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gap: 10 }}>
+                  {dashboard.topClient ? (
+                    <div style={tripSummaryCardStyle}>
+                      <span style={tripSummaryLabelStyle}>Cliente que mas genero</span>
+                      <strong style={tripSummaryValueStyle}>{dashboard.topClient.name}</strong>
+                      <span style={tripBreakdownTextStyle}>{formatMoneyLabel(dashboard.topClient.amount)} facturados</span>
+                    </div>
+                  ) : null}
+                  {dashboard.topPlace ? (
+                    <div style={tripSummaryCardStyle}>
+                      <span style={tripSummaryLabelStyle}>Destino mas frecuente</span>
+                      <strong style={tripSummaryValueStyle}>{dashboard.topPlace.name}</strong>
+                      <span style={tripBreakdownTextStyle}>
+                        {dashboard.topPlace.count} viaje{dashboard.topPlace.count > 1 ? "s" : ""}
+                      </span>
+                    </div>
+                  ) : null}
+                  <div style={tripSummaryCardStyle}>
+                    <span style={tripSummaryLabelStyle}>Valor promedio por kilometro</span>
+                    <strong style={tripSummaryValueStyle}>{formatMoneyLabel(dashboard.avgRatePerKm)} / km</strong>
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gap: 10 }}>
+                  <h3 style={{ margin: 0, fontSize: 18, color: "#2f241e" }}>Actividad por dia</h3>
+                  {dashboard.days.slice(0, visibleDaysCount).map((day) => (
+                    <article key={day.date} style={tripCardStyle}>
+                      <div style={tripCardTopRowStyle}>
+                        <strong style={{ fontSize: 16, color: "#2f241e" }}>{formatDateLabel(day.date)}</strong>
+                        <span style={tripCountBadgeStyle}>
+                          {day.trips} viaje{day.trips > 1 ? "s" : ""}
+                        </span>
+                      </div>
+                      <div style={tripCardFooterStyle}>
+                        <div style={{ display: "grid", gap: 4 }}>
+                          <span style={tripTotalLabelStyle}>Facturado</span>
+                          <span style={tripMoneyStyle}>{formatMoneyLabel(day.amount)}</span>
+                        </div>
+                        <span style={tripKmStyle}>{day.kilometers.toFixed(0)} km</span>
+                      </div>
+                      {day.pending > 0 ? (
+                        <div style={tripStatusBreakdownStyle}>
+                          <span style={tripBreakdownTextStyle}>Cobrado: {formatMoneyLabel(day.collected)}</span>
+                          <span style={tripBreakdownTextStyle}>Pendiente: {formatMoneyLabel(day.pending)}</span>
+                        </div>
+                      ) : null}
+                    </article>
+                  ))}
+                  {dashboard.days.length > visibleDaysCount ? (
+                    <button
+                      type="button"
+                      onClick={() => setVisibleDaysCount((current) => current + DAYS_PAGE_SIZE)}
+                      style={secondaryActionButtonStyle}
+                    >
+                      Ver mas dias
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            )}
           </section>
         ) : null}
 
@@ -2010,7 +2194,7 @@ const heroTopRowStyle: React.CSSProperties = {
 
 const tabsWrapStyle: React.CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
   gap: 10,
   marginTop: 16
 };
@@ -2041,6 +2225,21 @@ const panelStyle: React.CSSProperties = {
   background: "#fffdf9",
   border: "1px solid #ded3c6",
   boxShadow: "0 16px 34px rgba(73, 48, 34, 0.08)"
+};
+
+const dashboardStatsGridStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gap: 10
+};
+
+const dashboardStatCardStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 6,
+  padding: "14px 16px",
+  borderRadius: 18,
+  border: "1px solid #e0d3c4",
+  background: "linear-gradient(180deg, #fffaf2 0%, #f7efe3 100%)"
 };
 
 const fieldWrapStyle: React.CSSProperties = {
