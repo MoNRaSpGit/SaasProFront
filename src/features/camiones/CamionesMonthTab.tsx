@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 
 // Pestaña "Mes" (30/10/2026, pedido explicito): cuanto se facturo en el mes,
-// con un grafico por semana y cada semana desplegable de lunes a domingo.
+// con una grafica de los ultimos 6 meses,
+// y cada semana desplegable de lunes a domingo.
 // Las semanas son de calendario (lunes a domingo) recortadas al mes: la
 // semana 1 va del dia 1 hasta el primer domingo.
 
@@ -84,8 +85,21 @@ export function CamionesMonthTab({ items, loading, formatMoney }: Props) {
   const [openWeek, setOpenWeek] = useState<number | null>(null);
 
   const { weeks, totals } = useMemo(() => buildMonth(items, year, month), [items, year, month]);
-  const maxWeekAmount = Math.max(...weeks.map((week) => week.amount), 1);
-  const bestWeek = weeks.reduce<WeekTotals | null>((best, week) => (week.amount > (best?.amount ?? 0) ? week : best), null);
+
+  // Grafica de los ultimos 6 meses terminando en el mes elegido (30/10/2026,
+  // pedido explicito: antes era por semana). Los meses sin viajes quedan
+  // vacios; tocar una barra abre ese mes.
+  const lastMonths = useMemo(
+    () =>
+      Array.from({ length: 6 }, (_, i) => {
+        const date = new Date(year, month - 5 + i, 1);
+        const { totals: monthTotals } = buildMonth(items, date.getFullYear(), date.getMonth());
+        return { year: date.getFullYear(), month: date.getMonth(), amount: monthTotals.amount };
+      }),
+    [items, year, month]
+  );
+  const maxMonthAmount = Math.max(...lastMonths.map((item) => item.amount), 1);
+  const bestMonth = lastMonths.reduce<(typeof lastMonths)[number] | null>((best, item) => (item.amount > (best?.amount ?? 0) ? item : best), null);
 
   function moveMonth(delta: number) {
     const next = new Date(year, month + delta, 1);
@@ -98,7 +112,7 @@ export function CamionesMonthTab({ items, loading, formatMoney }: Props) {
     <section style={panelStyle}>
       <div style={{ display: "grid", gap: 8 }}>
         <h2 style={{ margin: 0, fontSize: 24, color: "#2f241e" }}>Tu mes</h2>
-        <p style={{ margin: 0, color: "#68594f", lineHeight: 1.5 }}>Lo facturado en el mes, semana por semana.</p>
+        <p style={{ margin: 0, color: "#68594f", lineHeight: 1.5 }}>Lo facturado en los últimos meses y semana por semana.</p>
       </div>
 
       <div style={monthPickerStyle}>
@@ -126,43 +140,49 @@ export function CamionesMonthTab({ items, loading, formatMoney }: Props) {
           </div>
 
           <div style={{ display: "grid", gap: 10 }}>
-            <h3 style={{ margin: 0, fontSize: 18, color: "#2f241e" }}>Semana por semana</h3>
+            <h3 style={{ margin: 0, fontSize: 18, color: "#2f241e" }}>Últimos 6 meses</h3>
             <div style={chartStyle}>
-              {weeks.map((week) => {
-                const height = (week.amount / maxWeekAmount) * 100;
-                const isBest = bestWeek?.index === week.index && week.amount > 0;
+              {lastMonths.map((item) => {
+                const height = (item.amount / maxMonthAmount) * 100;
+                const isBest = bestMonth !== null && bestMonth.year === item.year && bestMonth.month === item.month && item.amount > 0;
+                const isSelected = item.year === year && item.month === month;
                 return (
                   <button
-                    key={week.index}
+                    key={`${item.year}-${item.month}`}
                     type="button"
-                    onClick={() => setOpenWeek(openWeek === week.index ? null : week.index)}
+                    onClick={() => {
+                      setYear(item.year);
+                      setMonth(item.month);
+                      setOpenWeek(null);
+                    }}
                     style={chartColumnStyle}
-                    aria-label={`Ver semana ${week.index}`}
+                    aria-label={`Ver ${MONTH_NAMES[item.month]} ${item.year}`}
                   >
-                    <span style={{ fontSize: 11, fontWeight: 800, color: "#6e573f", whiteSpace: "nowrap" }}>
-                      {week.amount > 0 ? formatMoney(week.amount).replace(/\.00$/, "") : ""}
+                    <span style={{ fontSize: 10.5, fontWeight: 800, color: "#6e573f", whiteSpace: "nowrap" }}>
+                      {item.amount > 0 ? formatMoney(item.amount).replace(/\.00$/, "") : ""}
                     </span>
                     <div style={chartTrackStyle}>
                       <div
                         style={{
                           ...chartBarStyle,
-                          height: `${Math.max(height, week.amount > 0 ? 4 : 0)}%`,
+                          height: `${Math.max(height, item.amount > 0 ? 4 : 0)}%`,
                           background: isBest ? "linear-gradient(180deg, #e0a440 0%, #b97a1f 100%)" : "linear-gradient(180deg, #6b4f3c 0%, #38281f 100%)",
-                          outline: openWeek === week.index ? "3px solid #e0a440" : "none"
+                          outline: isSelected ? "3px solid #e0a440" : "none"
                         }}
                       />
                     </div>
-                    <span style={{ fontSize: 12, fontWeight: 800, color: "#2f241e" }}>Sem {week.index}</span>
+                    <span style={{ fontSize: 12, fontWeight: 800, color: isSelected ? "#8a5a14" : "#2f241e" }}>{shortMonth(item.month)}</span>
                   </button>
                 );
               })}
             </div>
-            {bestWeek && bestWeek.amount > 0 ? (
-              <span style={{ fontSize: 13, fontWeight: 700, color: "#8a5a14" }}>★ Mejor semana: semana {bestWeek.index}</span>
+            {bestMonth && bestMonth.amount > 0 ? (
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#8a5a14" }}>★ Mejor mes: {MONTH_NAMES[bestMonth.month].toLowerCase()}</span>
             ) : null}
           </div>
 
           <div style={{ display: "grid", gap: 10 }}>
+            <h3 style={{ margin: 0, fontSize: 18, color: "#2f241e" }}>Semana por semana</h3>
             {weeks.map((week) => {
               const first = week.days[0].day;
               const last = week.days[week.days.length - 1].day;
