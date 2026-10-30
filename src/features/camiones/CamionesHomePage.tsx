@@ -16,8 +16,9 @@ import {
   updateCamionesTrip
 } from "./camiones.client";
 import { CamionesClient, CamionesPlace, CamionesTrip } from "./camiones.types";
+import { CamionesMonthTab, type CamionesMonthItem } from "./CamionesMonthTab";
 
-type CamionesTab = "cliente" | "viaje" | "registro" | "localidad" | "panel";
+type CamionesTab = "cliente" | "viaje" | "registro" | "localidad" | "panel" | "mes";
 type ClientModalState = { mode: "create" | "edit"; clientId: number | null } | null;
 type PlaceModalState = { mode: "create" | "edit"; placeId: number | null } | null;
 type TripModalState = { tripId: number } | null;
@@ -392,7 +393,7 @@ export function CamionesHomePage() {
       placeInputRef.current?.focus();
     }
 
-    if (tab === "registro" || tab === "panel") {
+    if (tab === "registro" || tab === "panel" || tab === "mes") {
       void ensureTripsLoaded();
     }
 
@@ -587,6 +588,23 @@ export function CamionesHomePage() {
       days
     };
   }, [trips]);
+
+  // Datos para la pestaña Mes: misma cuenta que el Panel (sin cancelados).
+  const monthItems = useMemo<CamionesMonthItem[]>(
+    () =>
+      trips
+        .filter((trip) => trip.status !== "cancelled")
+        .map((trip) => {
+          const financials = getTripFinancials(trip);
+          return {
+            date: trip.tripDate.includes("T") ? trip.tripDate.slice(0, 10) : trip.tripDate,
+            amount: financials.totalAmount ?? 0,
+            collected: financials.collectedAmount,
+            kilometers: trip.kilometers
+          };
+        }),
+    [trips]
+  );
 
   function clearTripForm() {
     setTripDate(getTodayDate());
@@ -1263,7 +1281,12 @@ export function CamionesHomePage() {
           <button type="button" onClick={() => setTab("panel")} style={tab === "panel" ? activeTabStyle : tabStyle}>
             Panel
           </button>
+          <button type="button" onClick={() => setTab("mes")} style={tab === "mes" ? activeTabStyle : tabStyle}>
+            Mes
+          </button>
         </section>
+
+        {tab === "mes" ? <CamionesMonthTab items={monthItems} loading={tripsLoading && !tripsLoaded} formatMoney={formatMoneyLabel} /> : null}
 
         {tab === "cliente" ? (
           <section style={panelStyle}>
@@ -2194,13 +2217,15 @@ const heroTopRowStyle: React.CSSProperties = {
 
 const tabsWrapStyle: React.CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-  gap: 10,
+  gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+  gap: 8,
   marginTop: 16
 };
 
 const tabStyle: React.CSSProperties = {
   minHeight: 52,
+  padding: "0 4px",
+  fontSize: 14,
   borderRadius: 18,
   border: "1px solid #d8ccbf",
   background: "#fff8f0",
