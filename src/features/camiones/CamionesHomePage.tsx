@@ -444,7 +444,7 @@ export function CamionesHomePage() {
       }
 
       if (tripFilter === "pending") {
-        return trip.status === "pending" || trip.status === "confirmed";
+        return trip.status === "pending";
       }
 
       return trip.status === "paid";
@@ -519,6 +519,27 @@ export function CamionesHomePage() {
   const visibleGroupedTrips = useMemo(() => {
     return groupedTrips;
   }, [groupedTrips]);
+
+  // Totales por estado para los chips del registro (vistazo rapido, pedido explicito 01/11/2026).
+  const tripTotalsByFilter = useMemo(() => {
+    let confirmedTotal = 0;
+    let pendingTotal = 0;
+    let paidTotal = 0;
+
+    for (const trip of trips) {
+      const financials = getTripFinancials(trip);
+
+      if (trip.status === "confirmed") {
+        confirmedTotal += financials.pendingAmount ?? 0;
+      } else if (trip.status === "pending") {
+        pendingTotal += financials.pendingAmount ?? 0;
+      } else if (trip.status === "paid") {
+        paidTotal += financials.totalAmount ?? 0;
+      }
+    }
+
+    return { all: confirmedTotal, pending: pendingTotal, paid: paidTotal };
+  }, [trips]);
 
   // Panel de control (24/10/2026, pedido explicito): resumen de toda la
   // actividad cargada -- plata, kilometros, viajes y un desglose diario.
@@ -1750,17 +1771,20 @@ export function CamionesHomePage() {
             <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
               <div style={filterWrapStyle}>
                 <button type="button" onClick={() => setTripFilter("all")} style={tripFilter === "all" ? activeChipStyle : chipStyle}>
-                  Todos
+                  <span>Sin cobrar</span>
+                  <span style={chipAmountStyle}>{formatMoneyLabel(tripTotalsByFilter.all)}</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setTripFilter("pending")}
                   style={tripFilter === "pending" ? activeChipStyle : chipStyle}
                 >
-                  Pendientes
+                  <span>Con saldo</span>
+                  <span style={chipAmountStyle}>{formatMoneyLabel(tripTotalsByFilter.pending)}</span>
                 </button>
                 <button type="button" onClick={() => setTripFilter("paid")} style={tripFilter === "paid" ? activeChipStyle : chipStyle}>
-                  Pagados
+                  <span>Pagados</span>
+                  <span style={chipAmountStyle}>{formatMoneyLabel(tripTotalsByFilter.paid)}</span>
                 </button>
               </div>
 
@@ -2592,14 +2616,17 @@ const filterWrapStyle: React.CSSProperties = {
 };
 
 const chipStyle: React.CSSProperties = {
-  minHeight: 40,
+  minHeight: 48,
   padding: "8px 14px",
-  borderRadius: 999,
+  borderRadius: 18,
   border: "1px solid #d8ccbf",
   background: "#fff8f0",
   color: "#5d4a3e",
   fontWeight: 700,
-  cursor: "pointer"
+  cursor: "pointer",
+  display: "grid",
+  gap: 2,
+  justifyItems: "start"
 };
 
 const activeChipStyle: React.CSSProperties = {
@@ -2607,6 +2634,12 @@ const activeChipStyle: React.CSSProperties = {
   border: "1px solid #38281f",
   background: "#38281f",
   color: "#fbf5ec"
+};
+
+const chipAmountStyle: React.CSSProperties = {
+  fontSize: 13,
+  fontWeight: 600,
+  opacity: 0.85
 };
 
 const tripCardStyle: React.CSSProperties = {
