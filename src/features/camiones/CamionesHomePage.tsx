@@ -444,7 +444,7 @@ export function CamionesHomePage() {
       }
 
       if (tripFilter === "pending") {
-        return trip.status === "pending";
+        return trip.status === "pending" || trip.status === "confirmed";
       }
 
       return trip.status === "paid";
