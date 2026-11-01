@@ -1768,21 +1768,25 @@ export function CamionesHomePage() {
             <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
               <div style={filterWrapStyle}>
                 <button type="button" onClick={() => setTripFilter("all")} style={tripFilter === "all" ? activeChipStyle : chipStyle}>
-                  <span>Confirmados</span>
-                  <span style={chipAmountStyle}>{formatMoneyLabel(tripTotalsByFilter.all)}</span>
+                  Confirmados
                 </button>
                 <button
                   type="button"
                   onClick={() => setTripFilter("pending")}
                   style={tripFilter === "pending" ? activeChipStyle : chipStyle}
                 >
-                  <span>Pendientes</span>
-                  <span style={chipAmountStyle}>{formatMoneyLabel(tripTotalsByFilter.pending)}</span>
+                  Pendientes
                 </button>
                 <button type="button" onClick={() => setTripFilter("paid")} style={tripFilter === "paid" ? activeChipStyle : chipStyle}>
-                  <span>Cobrados</span>
-                  <span style={chipAmountStyle}>{formatMoneyLabel(tripTotalsByFilter.paid)}</span>
+                  Cobrados
                 </button>
+              </div>
+
+              <div style={filterTotalStyle}>
+                <span style={tripTotalLabelStyle}>
+                  Total {tripFilter === "all" ? "confirmado" : tripFilter === "pending" ? "pendiente" : "cobrado"}
+                </span>
+                <strong style={tripMoneyStyle}>{formatMoneyLabel(tripTotalsByFilter[tripFilter])}</strong>
               </div>
 
               {tripsLoading ? <div style={emptyBoxStyle}>Cargando registro...</div> : null}
@@ -2613,17 +2617,17 @@ const filterWrapStyle: React.CSSProperties = {
 };
 
 const chipStyle: React.CSSProperties = {
-  minHeight: 48,
+  minHeight: 40,
   padding: "8px 14px",
-  borderRadius: 18,
+  borderRadius: 999,
   border: "1px solid #d8ccbf",
   background: "#fff8f0",
   color: "#5d4a3e",
   fontWeight: 700,
   cursor: "pointer",
-  display: "grid",
-  gap: 2,
-  justifyItems: "start"
+  flex: 1,
+  textAlign: "center",
+  whiteSpace: "nowrap"
 };
 
 const activeChipStyle: React.CSSProperties = {
@@ -2633,10 +2637,15 @@ const activeChipStyle: React.CSSProperties = {
   color: "#fbf5ec"
 };
 
-const chipAmountStyle: React.CSSProperties = {
-  fontSize: 13,
-  fontWeight: 600,
-  opacity: 0.85
+const filterTotalStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "baseline",
+  justifyContent: "space-between",
+  gap: 8,
+  padding: "12px 14px",
+  borderRadius: 14,
+  background: "#fff3e3",
+  border: "1px solid #eadfd1"
 };
 
 const tripCardStyle: React.CSSProperties = {
