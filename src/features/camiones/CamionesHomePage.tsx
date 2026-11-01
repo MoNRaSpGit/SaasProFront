@@ -1284,7 +1284,10 @@ export function CamionesHomePage() {
             <ModelUserMenu
               variant="dark"
               showDashboardLink={false}
-              menuActions={[]}
+              menuActions={[
+                { label: "Panel", onSelect: () => setTab("panel") },
+                { label: "Mes", onSelect: () => setTab("mes") }
+              ]}
             />
           </div>
         </header>
@@ -1297,13 +1300,7 @@ export function CamionesHomePage() {
             Viaje
           </button>
           <button type="button" onClick={() => setTab("registro")} style={tab === "registro" ? activeTabStyle : tabStyle}>
-            Registro
-          </button>
-          <button type="button" onClick={() => setTab("panel")} style={tab === "panel" ? activeTabStyle : tabStyle}>
-            Panel
-          </button>
-          <button type="button" onClick={() => setTab("mes")} style={tab === "mes" ? activeTabStyle : tabStyle}>
-            Mes
+            Pagos
           </button>
         </section>
 
@@ -1764,14 +1761,14 @@ export function CamionesHomePage() {
         {tab === "registro" ? (
           <section style={panelStyle}>
             <div style={{ display: "grid", gap: 8 }}>
-              <h2 style={{ margin: 0, fontSize: 24, color: "#2f241e" }}>Registro</h2>
-              <p style={{ margin: 0, color: "#68594f" }}>Registro de viajes.</p>
+              <h2 style={{ margin: 0, fontSize: 24, color: "#2f241e" }}>Pagos</h2>
+              <p style={{ margin: 0, color: "#68594f" }}>Confirmados, pendientes y cobrados.</p>
             </div>
 
             <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
               <div style={filterWrapStyle}>
                 <button type="button" onClick={() => setTripFilter("all")} style={tripFilter === "all" ? activeChipStyle : chipStyle}>
-                  <span>Sin cobrar</span>
+                  <span>Confirmados</span>
                   <span style={chipAmountStyle}>{formatMoneyLabel(tripTotalsByFilter.all)}</span>
                 </button>
                 <button
@@ -1779,11 +1776,11 @@ export function CamionesHomePage() {
                   onClick={() => setTripFilter("pending")}
                   style={tripFilter === "pending" ? activeChipStyle : chipStyle}
                 >
-                  <span>Con saldo</span>
+                  <span>Pendientes</span>
                   <span style={chipAmountStyle}>{formatMoneyLabel(tripTotalsByFilter.pending)}</span>
                 </button>
                 <button type="button" onClick={() => setTripFilter("paid")} style={tripFilter === "paid" ? activeChipStyle : chipStyle}>
-                  <span>Pagados</span>
+                  <span>Cobrados</span>
                   <span style={chipAmountStyle}>{formatMoneyLabel(tripTotalsByFilter.paid)}</span>
                 </button>
               </div>
@@ -2241,7 +2238,7 @@ const heroTopRowStyle: React.CSSProperties = {
 
 const tabsWrapStyle: React.CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
   gap: 8,
   marginTop: 16
 };
