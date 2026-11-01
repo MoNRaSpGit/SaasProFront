@@ -511,6 +511,7 @@ export function CamionesHomePage() {
 
           return total + financials.pendingAmount;
         }, 0),
+        collectedAmount: orderedItems.reduce((total, trip) => total + getTripFinancials(trip).collectedAmount, 0),
         hasPricing: orderedItems.some((trip) => getTripFinancials(trip).totalAmount !== null)
       };
     });
@@ -1896,9 +1897,13 @@ export function CamionesHomePage() {
 
                     <div style={tripCardFooterStyle}>
                       <div style={{ display: "grid", gap: 4 }}>
-                        <span style={tripTotalLabelStyle}>Total pendiente</span>
+                        <span style={tripTotalLabelStyle}>
+                          {tripFilter === "paid" ? "Total cobrado" : tripFilter === "pending" ? "Total pendiente" : "Total confirmado"}
+                        </span>
                         {group.hasPricing ? (
-                          <span style={tripMoneyStyle}>{formatMoneyLabel(group.pendingAmount)}</span>
+                          <span style={tripMoneyStyle}>
+                            {formatMoneyLabel(tripFilter === "paid" ? group.collectedAmount : group.pendingAmount)}
+                          </span>
                         ) : null}
                       </div>
                       <span style={tripKmStyle}>{group.pendingKilometers.toFixed(0)} km</span>
