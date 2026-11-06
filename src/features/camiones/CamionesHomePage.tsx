@@ -15,7 +15,7 @@ import {
   updateCamionesPlace,
   updateCamionesTrip
 } from "./camiones.client";
-import { CamionesClient, CamionesPlace, CamionesTrip } from "./camiones.types";
+import { CamionesClient, CamionesPlace, CamionesTrip, CamionesTruck } from "./camiones.types";
 import { CamionesMonthTab, type CamionesMonthItem } from "./CamionesMonthTab";
 
 type CamionesTab = "cliente" | "viaje" | "registro" | "localidad" | "panel" | "mes";
@@ -213,6 +213,9 @@ export function CamionesHomePage() {
   const [kilometers, setKilometers] = useState("");
   const [ratePerKilometer, setRatePerKilometer] = useState("");
   const [tripDescription, setTripDescription] = useState("");
+  // Camion que hizo el viaje (06/11/2026): "" = sin elegir.
+  const [tripTruck, setTripTruck] = useState<CamionesTruck | "">("");
+  const [tripDraftTruck, setTripDraftTruck] = useState<CamionesTruck | "">("");
   const [tripFilter, setTripFilter] = useState<TripFilter>("all");
   const [clientsLoading, setClientsLoading] = useState(true);
   const [tripsLoading, setTripsLoading] = useState(false);
@@ -291,7 +294,8 @@ export function CamionesHomePage() {
     date: string,
     tripKilometers: number,
     tripRatePerKilometer: number,
-    description: string
+    description: string,
+    truck: CamionesTruck | null
   ): CamionesTrip {
     const timestamp = new Date().toISOString();
     const source = trips[0];
@@ -305,6 +309,7 @@ export function CamionesHomePage() {
       clientName: client.name,
       tripDate: date,
       place: toPlaceName,
+      truck,
       kilometers: Number(tripKilometers.toFixed(2)),
       status: "confirmed",
       collectedAmount: null,
@@ -622,7 +627,8 @@ export function CamionesHomePage() {
             date: trip.tripDate.includes("T") ? trip.tripDate.slice(0, 10) : trip.tripDate,
             amount: financials.totalAmount ?? 0,
             collected: financials.collectedAmount,
-            kilometers: trip.kilometers
+            kilometers: trip.kilometers,
+            truck: trip.truck
           };
         }),
     [trips]
@@ -637,6 +643,7 @@ export function CamionesHomePage() {
     setKilometers("");
     setRatePerKilometer("");
     setTripDescription("");
+    setTripTruck("");
   }
 
   function selectClient(client: CamionesClient) {
@@ -688,6 +695,7 @@ export function CamionesHomePage() {
     setTripDraftFromPlace(tripMeta.fromPlaceName);
     setTripDraftPlace(trip.place);
     setTripDraftKilometers(String(trip.kilometers));
+    setTripDraftTruck(trip.truck ?? "");
     setTripDraftRatePerKilometer(financials.ratePerKilometer ? String(financials.ratePerKilometer) : "");
     setTripDraftDescription(tripMeta.description);
     setTripDraftStatus(trip.status === "cancelled" ? "confirmed" : trip.status);
@@ -1095,7 +1103,8 @@ export function CamionesHomePage() {
     const previousRatePerKilometer = ratePerKilometer;
     const previousTripDescription = tripDescription;
     const previousTab = tab;
-    const optimisticTrip = buildOptimisticTrip(selectedClient, fromPlaceName, toPlaceName, tripDate, kmValue, rateValue, description);
+    const optimisticTrip = buildOptimisticTrip(selectedClient, fromPlaceName, toPlaceName, tripDate, kmValue, rateValue, description, tripTruck || null);
+    const previousTripTruck = tripTruck;
 
     setSavingTrip(true);
     setTrips((current) => [optimisticTrip, ...current]);
@@ -1107,6 +1116,7 @@ export function CamionesHomePage() {
     setKilometers("");
     setRatePerKilometer("");
     setTripDescription("");
+    setTripTruck("");
     setTripFilter("all");
     setTab("registro");
     setSavingTrip(false);
@@ -1116,6 +1126,7 @@ export function CamionesHomePage() {
       const payload = await createCamionesTrip({
         clientId: selectedClient.id,
         placeName: toPlaceName,
+        truck: tripTruck || undefined,
         tripDate,
         kilometers: Number(kmValue.toFixed(2)),
         notes: buildTripNotes(fromPlaceName, rateValue, kmValue, null, description)
@@ -1134,6 +1145,7 @@ export function CamionesHomePage() {
       setKilometers(previousKilometers);
       setRatePerKilometer(previousRatePerKilometer);
       setTripDescription(previousTripDescription);
+      setTripTruck(previousTripTruck);
       setTab(previousTab);
       toast.error(error instanceof Error ? error.message : "No se pudo guardar el viaje");
     }
@@ -1207,6 +1219,7 @@ export function CamionesHomePage() {
               tripDate: tripDateValue,
               placeId: null,
               place: placeName,
+              truck: tripDraftTruck || null,
               kilometers: Number(kilometersValue.toFixed(2)),
               status: tripDraftStatus,
               collectedAmount: nextCollectedAmount,
@@ -1232,6 +1245,7 @@ export function CamionesHomePage() {
     try {
       await updateCamionesTrip(tripId, {
         placeName,
+        truck: tripDraftTruck || undefined,
         tripDate: tripDateValue,
         kilometers: Number(kilometersValue.toFixed(2)),
         status: tripDraftStatus,
@@ -1578,6 +1592,15 @@ export function CamionesHomePage() {
                   placeholder="Ej: 105"
                   style={inputStyle}
                 />
+              </label>
+
+              <label style={fieldWrapStyle}>
+                <span style={fieldLabelStyle}>Camion</span>
+                <select value={tripTruck} onChange={(event) => setTripTruck(event.target.value as CamionesTruck | "")} style={inputStyle}>
+                  <option value="">Sin elegir</option>
+                  <option value="mercedes">Mercedes</option>
+                  <option value="honda">Honda</option>
+                </select>
               </label>
 
               <label style={fieldWrapStyle}>
@@ -2134,6 +2157,15 @@ export function CamionesHomePage() {
                   rows={3}
                   style={textAreaStyle}
                 />
+              </label>
+
+              <label style={fieldWrapStyle}>
+                <span style={fieldLabelStyle}>Camion</span>
+                <select value={tripDraftTruck} onChange={(event) => setTripDraftTruck(event.target.value as CamionesTruck | "")} style={inputStyle}>
+                  <option value="">Sin elegir</option>
+                  <option value="mercedes">Mercedes</option>
+                  <option value="honda">Honda</option>
+                </select>
               </label>
 
               <label style={fieldWrapStyle}>

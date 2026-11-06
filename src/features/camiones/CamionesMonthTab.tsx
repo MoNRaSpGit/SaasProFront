@@ -11,7 +11,16 @@ export type CamionesMonthItem = {
   amount: number;
   collected: number;
   kilometers: number;
+  truck: "mercedes" | "honda" | null;
 };
+
+// Porcentaje del chofer sobre lo que factura su camion (06/11/2026, pedido
+// explicito: 10% de lo facturado, no de lo cobrado).
+const DRIVER_PERCENT = 10;
+const TRUCKS: { key: "mercedes" | "honda"; label: string }[] = [
+  { key: "mercedes", label: "Mercedes" },
+  { key: "honda", label: "Honda" }
+];
 
 type Props = {
   items: CamionesMonthItem[];
@@ -86,6 +95,22 @@ export function CamionesMonthTab({ items, loading, formatMoney }: Props) {
 
   const { weeks, totals } = useMemo(() => buildMonth(items, year, month), [items, year, month]);
 
+  // Por camion: facturado del mes elegido y el 10% del chofer. Los viajes
+  // viejos sin camion se muestran aparte para poder asignarlos.
+  const truckTotals = useMemo(() => {
+    const prefix = `${year}-${String(month + 1).padStart(2, "0")}-`;
+    const monthItems = items.filter((item) => item.date.startsWith(prefix));
+    const sum = (list: CamionesMonthItem[]) => ({
+      trips: list.length,
+      kilometers: list.reduce((total, item) => total + item.kilometers, 0),
+      amount: list.reduce((total, item) => total + item.amount, 0)
+    });
+    return {
+      trucks: TRUCKS.map((truck) => ({ ...truck, ...sum(monthItems.filter((item) => item.truck === truck.key)) })),
+      unassigned: sum(monthItems.filter((item) => item.truck === null))
+    };
+  }, [items, year, month]);
+
   // Grafica de los ultimos 6 meses terminando en el mes elegido (30/10/2026,
   // pedido explicito: antes era por semana). Los meses sin viajes quedan
   // vacios; tocar una barra abre ese mes.
@@ -137,6 +162,31 @@ export function CamionesMonthTab({ items, loading, formatMoney }: Props) {
             <span style={{ fontSize: 14, fontWeight: 700, color: "#e8d9c6" }}>
               {totals.trips} viaje{totals.trips === 1 ? "" : "s"} · {totals.kilometers.toFixed(0)} km · Cobrado {formatMoney(totals.collected)}
             </span>
+          </div>
+
+          <div style={{ display: "grid", gap: 10 }}>
+            <h3 style={{ margin: 0, fontSize: 18, color: "#2f241e" }}>Por camión</h3>
+            {truckTotals.trucks.map((truck) => (
+              <article key={truck.key} style={weekCardStyle}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                  <div style={{ display: "grid", gap: 4 }}>
+                    <strong style={{ fontSize: 17, color: "#2f241e" }}>{truck.label}</strong>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "#8a745d" }}>
+                      {truck.trips} viaje{truck.trips === 1 ? "" : "s"} · {truck.kilometers.toFixed(0)} km · Facturó {formatMoney(truck.amount)}
+                    </span>
+                  </div>
+                  <div style={{ display: "grid", textAlign: "right" }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.06em", color: "#8a5a14" }}>Chofer {DRIVER_PERCENT}%</span>
+                    <strong style={{ fontSize: 20, color: "#8a5a14" }}>{formatMoney((truck.amount * DRIVER_PERCENT) / 100)}</strong>
+                  </div>
+                </div>
+              </article>
+            ))}
+            {truckTotals.unassigned.trips > 0 ? (
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#8a745d" }}>
+                {truckTotals.unassigned.trips} viaje{truckTotals.unassigned.trips === 1 ? "" : "s"} sin camión ({formatMoney(truckTotals.unassigned.amount)}) no entra{truckTotals.unassigned.trips === 1 ? "" : "n"} en esta cuenta. Se asigna desde el viaje.
+              </span>
+            ) : null}
           </div>
 
           <div style={{ display: "grid", gap: 10 }}>

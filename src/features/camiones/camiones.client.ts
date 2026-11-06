@@ -1,5 +1,5 @@
 import { fetchWithAuth } from "../auth/auth.client";
-import { CamionesClientsResponse, CamionesPlacesResponse, CamionesTripsResponse } from "./camiones.types";
+import { CamionesClientsResponse, CamionesPlacesResponse, CamionesTripsResponse, CamionesTruck } from "./camiones.types";
 import { API_BASE_URL } from "../../shared/config/api";
 
 async function readJson<T>(response: Response): Promise<T> {
@@ -127,6 +127,7 @@ export async function createCamionesTrip(payload: {
   clientId: number;
   placeId?: number;
   placeName?: string;
+  truck?: CamionesTruck;
   tripDate: string;
   kilometers: number;
   notes?: string;
@@ -153,6 +154,7 @@ export async function updateCamionesTrip(
   payload: {
     placeId?: number;
     placeName?: string;
+    truck?: CamionesTruck;
     tripDate: string;
     kilometers: number;
     status?: "confirmed" | "pending" | "paid";

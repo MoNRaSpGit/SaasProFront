@@ -12,6 +12,8 @@ export type CamionesClient = {
 
 export type CamionesTripStatus = "confirmed" | "pending" | "paid" | "cancelled";
 
+export type CamionesTruck = "mercedes" | "honda";
+
 export type CamionesTrip = {
   id: number;
   tenantId: number;
@@ -22,6 +24,7 @@ export type CamionesTrip = {
   clientName: string;
   tripDate: string;
   place: string;
+  truck: CamionesTruck | null;
   kilometers: number;
   status: CamionesTripStatus;
   collectedAmount: number | null;
