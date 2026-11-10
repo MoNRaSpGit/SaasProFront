@@ -1599,7 +1599,7 @@ export function CamionesHomePage() {
                 <select value={tripTruck} onChange={(event) => setTripTruck(event.target.value as CamionesTruck | "")} style={inputStyle}>
                   <option value="">Sin elegir</option>
                   <option value="mercedes">Mercedes</option>
-                  <option value="honda">Honda</option>
+                  <option value="volkswagen">Volkswagen</option>
                 </select>
               </label>
 
@@ -2164,7 +2164,7 @@ export function CamionesHomePage() {
                 <select value={tripDraftTruck} onChange={(event) => setTripDraftTruck(event.target.value as CamionesTruck | "")} style={inputStyle}>
                   <option value="">Sin elegir</option>
                   <option value="mercedes">Mercedes</option>
-                  <option value="honda">Honda</option>
+                  <option value="volkswagen">Volkswagen</option>
                 </select>
               </label>
 

@@ -12,7 +12,7 @@ export type CamionesClient = {
 
 export type CamionesTripStatus = "confirmed" | "pending" | "paid" | "cancelled";
 
-export type CamionesTruck = "mercedes" | "honda";
+export type CamionesTruck = "mercedes" | "volkswagen";
 
 export type CamionesTrip = {
   id: number;

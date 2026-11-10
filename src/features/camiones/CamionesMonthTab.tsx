@@ -11,15 +11,15 @@ export type CamionesMonthItem = {
   amount: number;
   collected: number;
   kilometers: number;
-  truck: "mercedes" | "honda" | null;
+  truck: "mercedes" | "volkswagen" | null;
 };
 
 // Porcentaje del chofer sobre lo que factura su camion (06/11/2026, pedido
 // explicito: 10% de lo facturado, no de lo cobrado).
 const DRIVER_PERCENT = 10;
-const TRUCKS: { key: "mercedes" | "honda"; label: string }[] = [
+const TRUCKS: { key: "mercedes" | "volkswagen"; label: string }[] = [
   { key: "mercedes", label: "Mercedes" },
-  { key: "honda", label: "Honda" }
+  { key: "volkswagen", label: "Volkswagen" }
 ];
 
 type Props = {
