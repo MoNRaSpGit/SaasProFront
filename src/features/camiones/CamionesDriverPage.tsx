@@ -10,6 +10,7 @@ import type { CamionesClient, CamionesPlace, CamionesTruck } from "./camiones.ty
 // kilometros ni valor: eso lo hace el administrador (La Milagrosa).
 
 type DriverTab = "cliente" | "viaje" | "mis";
+type HistoryView = "pendientes" | "pagados";
 
 function today() {
   const now = new Date();
@@ -67,8 +68,11 @@ export function CamionesDriverPage() {
     return clients.filter((item) => item.name.toLowerCase().includes(query));
   }, [clientSearch, clients]);
 
-  const confirmedTrips = useMemo(() => myTrips.filter((trip) => trip.confirmed), [myTrips]);
-  const sentTrips = useMemo(() => myTrips.filter((trip) => !trip.confirmed), [myTrips]);
+  const [historyView, setHistoryView] = useState<HistoryView>("pendientes");
+  // Pendientes: todo lo que todavia no se pago (enviado, aprobado, terminado).
+  // Pagados: lo que ya se cobro.
+  const pendingTrips = useMemo(() => myTrips.filter((trip) => !trip.paid), [myTrips]);
+  const paidTrips = useMemo(() => myTrips.filter((trip) => trip.paid), [myTrips]);
 
   async function handleFinish(tripId: number) {
     try {
@@ -142,7 +146,7 @@ export function CamionesDriverPage() {
             Viaje
           </button>
           <button type="button" onClick={() => setTab("mis")} style={tab === "mis" ? activeTabStyle : tabStyle}>
-            Mis viajes
+            Historial
           </button>
         </section>
 
@@ -241,19 +245,31 @@ export function CamionesDriverPage() {
 
         {tab === "mis" ? (
           <section style={panelStyle}>
-            <h2 style={titleStyle}>Mis viajes</h2>
+            <h2 style={titleStyle}>Historial</h2>
+            <div style={{ ...twoColsStyle, marginTop: 12 }}>
+              <button type="button" onClick={() => setHistoryView("pendientes")} style={historyView === "pendientes" ? activeTabStyle : tabStyle}>
+                Por confirmar ({pendingTrips.length})
+              </button>
+              <button type="button" onClick={() => setHistoryView("pagados")} style={historyView === "pagados" ? activeTabStyle : tabStyle}>
+                Pagados ({paidTrips.length})
+              </button>
+            </div>
             <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
-              <h3 style={subtitleStyle}>Confirmados</h3>
-              {confirmedTrips.length === 0 ? <div style={emptyBoxStyle}>Todavía no tenés viajes confirmados.</div> : null}
-              {confirmedTrips.slice(0, 30).map((trip) => (
-                <TripCard key={trip.id} trip={trip} onFinish={() => void handleFinish(trip.id)} />
-              ))}
-
-              <h3 style={subtitleStyle}>Esperando confirmación</h3>
-              {sentTrips.length === 0 ? <div style={emptyBoxStyle}>No tenés viajes esperando.</div> : null}
-              {sentTrips.slice(0, 20).map((trip) => (
-                <TripCard key={trip.id} trip={trip} />
-              ))}
+              {historyView === "pendientes" ? (
+                <>
+                  {pendingTrips.length === 0 ? <div style={emptyBoxStyle}>No tenés viajes pendientes.</div> : null}
+                  {pendingTrips.slice(0, 40).map((trip) => (
+                    <TripCard key={trip.id} trip={trip} onFinish={() => void handleFinish(trip.id)} />
+                  ))}
+                </>
+              ) : (
+                <>
+                  {paidTrips.length === 0 ? <div style={emptyBoxStyle}>Todavía no tenés viajes pagados.</div> : null}
+                  {paidTrips.slice(0, 40).map((trip) => (
+                    <TripCard key={trip.id} trip={trip} />
+                  ))}
+                </>
+              )}
             </div>
           </section>
         ) : null}
@@ -305,7 +321,6 @@ const tabStyle: React.CSSProperties = { minHeight: 52, padding: "0 4px", fontSiz
 const activeTabStyle: React.CSSProperties = { ...tabStyle, border: "1px solid #38281f", background: "#38281f", color: "#fbf5ec", boxShadow: "0 14px 26px rgba(36, 25, 19, 0.22)" };
 const panelStyle: React.CSSProperties = { marginTop: 16, padding: 16, borderRadius: 24, background: "#fffdf9", border: "1px solid #ded3c6", boxShadow: "0 16px 34px rgba(73, 48, 34, 0.08)" };
 const titleStyle: React.CSSProperties = { margin: 0, fontSize: 24, color: "#2f241e" };
-const subtitleStyle: React.CSSProperties = { margin: "6px 0 0", fontSize: 17, color: "#4c3d34" };
 const fieldWrapStyle: React.CSSProperties = { display: "grid", gap: 8 };
 const fieldLabelStyle: React.CSSProperties = { fontSize: 14, fontWeight: 700, color: "#4c3d34" };
 const inputStyle: React.CSSProperties = { width: "100%", minHeight: 54, padding: "14px 16px", borderRadius: 18, border: "1px solid #d8ccbf", background: "#fffaf4", fontSize: 17, boxSizing: "border-box" };
