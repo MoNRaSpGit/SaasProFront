@@ -160,6 +160,7 @@ export async function updateCamionesTrip(
     status?: "confirmed" | "pending" | "paid";
     collectedAmount?: number;
     notes?: string;
+    driverUserId?: number;
   }
 ) {
   const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/camiones/trips/${tripId}`, {
@@ -212,6 +213,12 @@ export type CamionesMyTrip = {
   done: boolean;
   paid: boolean;
 };
+
+// Camioneros del tenant (para pasarle un viaje a otro).
+export async function listCamionesDrivers() {
+  const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/camiones/drivers`);
+  return readJson<{ items: Array<{ id: number; name: string }> }>(response);
+}
 
 export async function listMyCamionesTrips() {
   const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/camiones/trips/mine`);

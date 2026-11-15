@@ -9,6 +9,7 @@ import {
   createCamionesTrip,
   deleteCamionesTrip as deleteCamionesTripRequest,
   listCamionesClients,
+  listCamionesDrivers,
   listCamionesPlaces,
   listCamionesTrips,
   payoutCamionesDriver,
@@ -261,6 +262,10 @@ export function CamionesHomePage() {
   // Camion que hizo el viaje (06/11/2026): "" = sin elegir.
   const [tripTruck, setTripTruck] = useState<CamionesTruck | "">("");
   const [tripDraftTruck, setTripDraftTruck] = useState<CamionesTruck | "">("");
+  // Camionero del viaje (se puede pasar a otro) y la lista de camioneros.
+  const [tripDraftDriverId, setTripDraftDriverId] = useState<number | null>(null);
+  const [tripOriginalDriverId, setTripOriginalDriverId] = useState<number | null>(null);
+  const [driverOptions, setDriverOptions] = useState<Array<{ id: number; name: string }>>([]);
   const [tripFilter, setTripFilter] = useState<TripFilter>("all");
   const [clientsLoading, setClientsLoading] = useState(true);
   const [tripsLoading, setTripsLoading] = useState(false);
@@ -432,6 +437,9 @@ export function CamionesHomePage() {
 
   useEffect(() => {
     void loadInitialClients();
+    void listCamionesDrivers()
+      .then((payload) => setDriverOptions(payload.items))
+      .catch(() => undefined);
   }, [loadInitialClients]);
 
   // Para ver al toque los viajes nuevos de los camioneros: se cargan al
@@ -754,6 +762,8 @@ export function CamionesHomePage() {
     setTripDraftPlace(trip.place);
     setTripDraftKilometers(trip.kilometers > 0 ? String(trip.kilometers) : "");
     setTripDraftTruck(trip.truck ?? "");
+    setTripDraftDriverId(trip.createdByIsDriver ? trip.userId : null);
+    setTripOriginalDriverId(trip.createdByIsDriver ? trip.userId : null);
     setTripDraftRatePerKilometer(financials.ratePerKilometer ? String(financials.ratePerKilometer) : "");
     setTripDraftDescription(tripMeta.description);
     setTripDraftStatus(trip.status === "cancelled" ? "confirmed" : trip.status);
@@ -1311,7 +1321,8 @@ export function CamionesHomePage() {
         kilometers: Number(kilometersValue.toFixed(2)),
         status: tripDraftStatus,
         collectedAmount: nextCollectedAmount ?? undefined,
-        notes: buildTripNotes(fromPlaceName, rateValue, kilometersValue, nextCollectedAmount, description, originalTrailer)
+        notes: buildTripNotes(fromPlaceName, rateValue, kilometersValue, nextCollectedAmount, description, originalTrailer),
+        driverUserId: tripDraftDriverId !== null && tripDraftDriverId !== tripOriginalDriverId ? tripDraftDriverId : undefined
       });
       void refreshTrips();
     } catch (error) {
@@ -2507,6 +2518,20 @@ export function CamionesHomePage() {
                   style={textAreaStyle}
                 />
               </label>
+
+              {tripDraftDriverId !== null && driverOptions.length > 0 ? (
+                <label style={fieldWrapStyle}>
+                  <span style={fieldLabelStyle}>Camionero</span>
+                  <select value={tripDraftDriverId} onChange={(event) => setTripDraftDriverId(Number(event.target.value))} style={inputStyle}>
+                    {driverOptions.map((driver) => (
+                      <option key={driver.id} value={driver.id}>
+                        {driver.name}
+                        {driver.id === tripOriginalDriverId ? " (el que lo cargó)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
 
               <label style={fieldWrapStyle}>
                 <span style={fieldLabelStyle}>Camion</span>

@@ -15,17 +15,18 @@ type QuickAccessAccount = {
 
 const QUICK_ACCESS_ACCOUNTS: QuickAccessAccount[] = [
   // Accesos rapidos TEMPORALES (15/11/2026, pedido explicito) para probar:
-  // sacar antes de dar la app a los usuarios reales.
+  // sacar antes de dar la app a los usuarios reales. El administrador ya
+  // NO tiene acceso automatico (entra escribiendo usuario y clave).
   {
-    id: "admin",
-    label: "Entrar como administrador",
-    identifier: "Lamilagrosa",
-    password: "1994"
+    id: "rodrigo",
+    label: "Entrar como Rodrigo",
+    identifier: "ejemplo-julio@saaspro.local",
+    password: "ejemplo1234"
   },
   {
-    id: "camionero",
-    label: "Entrar como camionero",
-    identifier: "ejemplo-julio@saaspro.local",
+    id: "gabriel",
+    label: "Entrar como Gabriel",
+    identifier: "ejemplo-marcos@saaspro.local",
     password: "ejemplo1234"
   }
 ];
