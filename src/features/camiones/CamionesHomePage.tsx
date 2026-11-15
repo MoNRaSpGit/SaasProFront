@@ -1358,7 +1358,6 @@ export function CamionesHomePage() {
               variant="dark"
               showDashboardLink={false}
               menuActions={[
-                { label: unvaluedTrips.length > 0 ? `Camioneros (${unvaluedTrips.length} por valorar)` : "Camioneros", onSelect: () => setTab("camioneros") },
                 { label: "Panel", onSelect: () => setTab("panel") },
                 { label: "Mes", onSelect: () => setTab("mes") }
               ]}
@@ -1376,33 +1375,40 @@ export function CamionesHomePage() {
           <button type="button" onClick={() => setTab("registro")} style={tab === "registro" ? activeTabStyle : tabStyle}>
             Pagos
           </button>
-        </section>
-
-        {unvaluedTrips.length > 0 && tab !== "camioneros" ? (
           <button
             type="button"
             onClick={() => {
               setDriverView("choferes");
               setTab("camioneros");
             }}
-            style={{
-              marginTop: 12,
-              width: "100%",
-              minHeight: 48,
-              padding: "10px 14px",
-              borderRadius: 18,
-              border: "1px solid #e3c27a",
-              background: "#fdeec6",
-              color: "#7a5a12",
-              fontWeight: 800,
-              fontSize: 15,
-              cursor: "pointer",
-              textAlign: "left"
-            }}
+            style={{ ...(tab === "camioneros" ? activeTabStyle : tabStyle), position: "relative" }}
           >
-            🔔 {unvaluedTrips.length} viaje{unvaluedTrips.length === 1 ? "" : "s"} de camioneros esperando tu aprobación →
+            Camioneros
+            {unvaluedTrips.length > 0 ? (
+              <span
+                aria-label={`${unvaluedTrips.length} por aprobar`}
+                style={{
+                  position: "absolute",
+                  top: -6,
+                  right: -4,
+                  minWidth: 22,
+                  height: 22,
+                  padding: "0 6px",
+                  borderRadius: 999,
+                  background: "#d92d20",
+                  color: "#fff",
+                  fontSize: 12,
+                  fontWeight: 800,
+                  lineHeight: "22px",
+                  boxSizing: "border-box",
+                  boxShadow: "0 2px 6px rgba(217, 45, 32, 0.45)"
+                }}
+              >
+                {unvaluedTrips.length}
+              </span>
+            ) : null}
           </button>
-        ) : null}
+        </section>
 
         {tab === "mes" ? <CamionesMonthTab items={monthItems} loading={tripsLoading && !tripsLoaded} formatMoney={formatMoneyLabel} /> : null}
 
@@ -2659,15 +2665,15 @@ const heroTopRowStyle: React.CSSProperties = {
 
 const tabsWrapStyle: React.CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-  gap: 8,
+  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+  gap: 6,
   marginTop: 16
 };
 
 const tabStyle: React.CSSProperties = {
-  minHeight: 52,
-  padding: "0 4px",
-  fontSize: 14,
+  minHeight: 48,
+  padding: "0 2px",
+  fontSize: 13,
   borderRadius: 18,
   border: "1px solid #d8ccbf",
   background: "#fff8f0",
