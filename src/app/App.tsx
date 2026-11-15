@@ -1,6 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { DashboardPage } from "../features/auth/DashboardPage";
-import { CamionesHomePage } from "../features/camiones/CamionesHomePage";
+import { CamionesEntry } from "../features/camiones/CamionesEntry";
 import { LoginPage } from "../features/auth/LoginPage";
 import { ProtectedRoute } from "../features/auth/ProtectedRoute";
 import { RegisterPage } from "../features/auth/RegisterPage";
@@ -40,7 +40,7 @@ export function App() {
         path="/camiones"
         element={
           <ProtectedRoute requiredModule="camiones">
-            <CamionesHomePage />
+            <CamionesEntry />
           </ProtectedRoute>
         }
       />

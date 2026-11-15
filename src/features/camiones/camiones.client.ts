@@ -178,3 +178,27 @@ export async function deleteCamionesTrip(tripId: number) {
 
   return readJson<{ ok: true }>(response);
 }
+
+// Camioneros (14/11/2026): cargan el viaje sin km ni valor.
+export async function submitCamionesDriverTrip(payload: {
+  clientId: number;
+  truck: CamionesTruck;
+  withTrailer: boolean;
+  tripDate: string;
+  fromPlaceName: string;
+  placeName: string;
+  description?: string;
+}) {
+  const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/camiones/trips/submit`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+  return readJson<{ trip: CamionesTripsResponse["items"][number] }>(response);
+}
+
+export async function listMyCamionesTrips() {
+  const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/camiones/trips/mine`);
+  return readJson<{ items: CamionesTripsResponse["items"] }>(response);
+}

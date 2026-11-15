@@ -18,7 +18,7 @@ import {
 import { CamionesClient, CamionesPlace, CamionesTrip, CamionesTruck } from "./camiones.types";
 import { CamionesMonthTab, type CamionesMonthItem } from "./CamionesMonthTab";
 
-type CamionesTab = "cliente" | "viaje" | "registro" | "localidad" | "panel" | "mes";
+type CamionesTab = "cliente" | "viaje" | "registro" | "localidad" | "panel" | "mes" | "valorar";
 type ClientModalState = { mode: "create" | "edit"; clientId: number | null } | null;
 type PlaceModalState = { mode: "create" | "edit"; placeId: number | null } | null;
 type TripModalState = { tripId: number } | null;
@@ -30,6 +30,8 @@ const RATE_PER_KM_PREFIX = "rate-per-km::";
 const TOTAL_AMOUNT_PREFIX = "trip-total::";
 const COLLECTED_AMOUNT_PREFIX = "collected-amount::";
 const DESCRIPTION_PREFIX = "trip-description::";
+// Camioneros (14/11/2026): "zorra::si" / "zorra::no" -- el camion fue con o sin zorra.
+const ZORRA_PREFIX = "zorra::";
 const TRIP_NOTES_SEPARATOR = "||";
 
 function getTodayDate() {
@@ -77,7 +79,8 @@ function readTripMeta(notes: string | null) {
     ratePerKilometer: null as number | null,
     totalAmount: null as number | null,
     collectedAmount: null as number | null,
-    description: ""
+    description: "",
+    trailer: null as "si" | "no" | null
   };
 
   if (!notes) {
@@ -92,6 +95,12 @@ function readTripMeta(notes: string | null) {
     if (token.startsWith(ROUTE_FROM_PREFIX)) {
       detectedStructuredToken = true;
       meta.fromPlaceName = token.slice(ROUTE_FROM_PREFIX.length).trim();
+      continue;
+    }
+
+    if (token.startsWith(ZORRA_PREFIX)) {
+      detectedStructuredToken = true;
+      meta.trailer = token.slice(ZORRA_PREFIX.length).trim() === "si" ? "si" : "no";
       continue;
     }
 
@@ -131,7 +140,8 @@ function buildTripNotes(
   ratePerKilometer: number,
   tripKilometers: number,
   collectedAmount?: number | null,
-  description?: string
+  description?: string,
+  trailer?: "si" | "no" | null
 ) {
   const normalizedRate = Number(ratePerKilometer.toFixed(2));
   const totalAmount = Number((normalizedRate * tripKilometers).toFixed(2));
@@ -147,6 +157,10 @@ function buildTripNotes(
 
   if (description?.trim()) {
     tokens.push(`${DESCRIPTION_PREFIX}${description.trim()}`);
+  }
+
+  if (trailer) {
+    tokens.push(`${ZORRA_PREFIX}${trailer}`);
   }
 
   return tokens.join(TRIP_NOTES_SEPARATOR);
@@ -199,7 +213,15 @@ export function CamionesHomePage() {
   const [tab, setTab] = useState<CamionesTab>("cliente");
   const [clients, setClients] = useState<CamionesClient[]>([]);
   const [places, setPlaces] = useState<CamionesPlace[]>([]);
-  const [trips, setTrips] = useState<CamionesTrip[]>([]);
+  const [allTrips, setTrips] = useState<CamionesTrip[]>([]);
+  // Los viajes que cargan los camioneros llegan con 0 km y sin valor ("por
+  // valorar"): no entran a Pagos / Panel / Mes hasta que el administrador
+  // les pone km y valor.
+  const trips = useMemo(() => allTrips.filter((trip) => trip.kilometers > 0), [allTrips]);
+  const unvaluedTrips = useMemo(
+    () => allTrips.filter((trip) => trip.kilometers <= 0 && trip.status !== "cancelled"),
+    [allTrips]
+  );
   const [clientSearch, setClientSearch] = useState("");
   const [clientListExpanded, setClientListExpanded] = useState(false);
   const [visibleClientCount, setVisibleClientCount] = useState(CLIENTS_PAGE_SIZE);
@@ -388,6 +410,18 @@ export function CamionesHomePage() {
   useEffect(() => {
     void loadInitialClients();
   }, [loadInitialClients]);
+
+  // Para ver al toque los viajes nuevos de los camioneros: se cargan al
+  // entrar y se refrescan cada minuto mientras la pantalla esta visible.
+  useEffect(() => {
+    void ensureTripsLoaded();
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void refreshTrips().catch(() => undefined);
+      }
+    }, 60000);
+    return () => window.clearInterval(timer);
+  }, [ensureTripsLoaded, refreshTrips]);
 
   useEffect(() => {
     if (tab === "cliente") {
@@ -694,7 +728,7 @@ export function CamionesHomePage() {
     setTripDraftDate(trip.tripDate.includes("T") ? trip.tripDate.slice(0, 10) : trip.tripDate);
     setTripDraftFromPlace(tripMeta.fromPlaceName);
     setTripDraftPlace(trip.place);
-    setTripDraftKilometers(String(trip.kilometers));
+    setTripDraftKilometers(trip.kilometers > 0 ? String(trip.kilometers) : "");
     setTripDraftTruck(trip.truck ?? "");
     setTripDraftRatePerKilometer(financials.ratePerKilometer ? String(financials.ratePerKilometer) : "");
     setTripDraftDescription(tripMeta.description);
@@ -752,7 +786,7 @@ export function CamionesHomePage() {
     const mode = clientModalState?.mode;
     const editingClientId = clientModalState?.clientId ?? null;
     const previousClients = clients;
-    const previousTrips = trips;
+    const previousTrips = allTrips;
     const previousSelectedClient = selectedClient;
     const previousClientSearch = clientSearch;
     const previousTab = tab;
@@ -854,7 +888,7 @@ export function CamionesHomePage() {
 
     const clientId = clientModalState.clientId;
     const previousClients = clients;
-    const previousTrips = trips;
+    const previousTrips = allTrips;
     const previousSelectedClient = selectedClient;
     const previousClientSearch = clientSearch;
 
@@ -1091,7 +1125,7 @@ export function CamionesHomePage() {
       return;
     }
 
-    const previousTrips = trips;
+    const previousTrips = allTrips;
     const previousClientSearch = clientSearch;
     const previousSelectedClient = selectedClient;
     const previousTripDate = tripDate;
@@ -1166,6 +1200,9 @@ export function CamionesHomePage() {
       return;
     }
 
+    // La zorra la carga el camionero: al editar se conserva tal cual.
+    const originalTrailer = readTripMeta(allTrips.find((trip) => trip.id === tripId)?.notes ?? null).trailer;
+
     if (!tripDateValue) {
       toast.error("Falta la fecha");
       return;
@@ -1203,7 +1240,7 @@ export function CamionesHomePage() {
       }
     }
 
-    const previousTrips = trips;
+    const previousTrips = allTrips;
     const nextCollectedAmount =
       tripDraftStatus === "pending"
         ? Number(collectedAmountValue.toFixed(2))
@@ -1224,7 +1261,7 @@ export function CamionesHomePage() {
               status: tripDraftStatus,
               collectedAmount: nextCollectedAmount,
               paidAt: tripDraftStatus === "paid" ? new Date().toISOString() : null,
-              notes: buildTripNotes(fromPlaceName, rateValue, kilometersValue, nextCollectedAmount, description),
+              notes: buildTripNotes(fromPlaceName, rateValue, kilometersValue, nextCollectedAmount, description, originalTrailer),
               updatedAt: new Date().toISOString()
             }
           : trip
@@ -1250,7 +1287,7 @@ export function CamionesHomePage() {
         kilometers: Number(kilometersValue.toFixed(2)),
         status: tripDraftStatus,
         collectedAmount: nextCollectedAmount ?? undefined,
-        notes: buildTripNotes(fromPlaceName, rateValue, kilometersValue, nextCollectedAmount, description)
+        notes: buildTripNotes(fromPlaceName, rateValue, kilometersValue, nextCollectedAmount, description, originalTrailer)
       });
       void refreshTrips();
     } catch (error) {
@@ -1265,7 +1302,7 @@ export function CamionesHomePage() {
       return;
     }
 
-    const previousTrips = trips;
+    const previousTrips = allTrips;
     setDeletingTripId(tripId);
     setTrips((current) => current.filter((trip) => trip.id !== tripId));
     setTripDeleteConfirmState(null);
@@ -1317,6 +1354,11 @@ export function CamionesHomePage() {
           <button type="button" onClick={() => setTab("registro")} style={tab === "registro" ? activeTabStyle : tabStyle}>
             Pagos
           </button>
+          {unvaluedTrips.length > 0 || tab === "valorar" ? (
+            <button type="button" onClick={() => setTab("valorar")} style={tab === "valorar" ? activeTabStyle : tabStyle}>
+              Por valorar ({unvaluedTrips.length})
+            </button>
+          ) : null}
         </section>
 
         {tab === "mes" ? <CamionesMonthTab items={monthItems} loading={tripsLoading && !tripsLoaded} formatMoney={formatMoneyLabel} /> : null}
@@ -1782,6 +1824,51 @@ export function CamionesHomePage() {
           </section>
         ) : null}
 
+        {tab === "valorar" ? (
+          <section style={panelStyle}>
+            <div style={{ display: "grid", gap: 8 }}>
+              <h2 style={{ margin: 0, fontSize: 24, color: "#2f241e" }}>Por valorar</h2>
+              <p style={{ margin: 0, color: "#68594f", lineHeight: 1.5 }}>
+                Viajes que cargaron los camioneros. Tocá uno y poné los kilómetros y el valor.
+              </p>
+            </div>
+            <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
+              {tripsLoading && !tripsLoaded ? (
+                <p style={{ margin: 0, color: "#68594f" }}>Cargando...</p>
+              ) : unvaluedTrips.length === 0 ? (
+                <p style={{ margin: 0, color: "#68594f" }}>No hay viajes por valorar. 🎉</p>
+              ) : (
+                unvaluedTrips.map((trip) => {
+                  const meta = readTripMeta(trip.notes);
+                  const route = getTripRouteParts(trip);
+                  return (
+                    <article key={trip.id} style={tripCardStyle}>
+                      <div style={tripCardTopRowStyle}>
+                        <strong style={{ color: "#2f241e" }}>{trip.clientName}</strong>
+                        <span style={{ color: "#68594f", fontSize: 13 }}>{formatDateLabel(trip.tripDate)}</span>
+                      </div>
+                      <div style={{ color: "#2f241e" }}>
+                        {route.from} → {route.to}
+                      </div>
+                      <div style={{ color: "#68594f", fontSize: 14 }}>
+                        {trip.truck === "mercedes" ? "Mercedes" : trip.truck === "volkswagen" ? "Volkswagen" : "Camión sin asignar"}
+                        {meta.trailer === "si" ? " · con zorra" : meta.trailer === "no" ? " · sin zorra" : ""}
+                        {trip.createdByName ? ` · cargó ${trip.createdByName}` : ""}
+                      </div>
+                      {meta.description ? <p style={tripDescriptionStyle}>{meta.description}</p> : null}
+                      <div>
+                        <button type="button" onClick={() => openTripDetailsModal(trip)} style={miniActionButtonStyle}>
+                          Poner valor
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })
+              )}
+            </div>
+          </section>
+        ) : null}
+
         {tab === "registro" ? (
           <section style={panelStyle}>
             <div style={{ display: "grid", gap: 8 }}>
@@ -1878,6 +1965,7 @@ export function CamionesHomePage() {
                               </div>
                             ) : null}
 
+                            {tripMeta.trailer === "si" ? <p style={tripDescriptionStyle}>Con zorra</p> : null}
                             {tripMeta.description ? <p style={tripDescriptionStyle}>{tripMeta.description}</p> : null}
 
                             <div style={tripRouteItemFooterStyle}>
