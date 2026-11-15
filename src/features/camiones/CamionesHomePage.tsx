@@ -222,6 +222,7 @@ export function CamionesHomePage() {
   // les pone km y valor.
   const trips = useMemo(() => allTrips.filter((trip) => trip.kilometers > 0), [allTrips]);
   const [payingDriver, setPayingDriver] = useState<number | null>(null);
+  const [selectedDriver, setSelectedDriver] = useState<string | null>(null);
   // Pestaña "Camioneros": lo que cargó cada camionero, valorado o no.
   const driverGroups = useMemo(() => {
     const groups = new Map<string, CamionesTrip[]>();
@@ -1838,53 +1839,47 @@ export function CamionesHomePage() {
           <section style={panelStyle}>
             <div style={{ display: "grid", gap: 8 }}>
               <h2 style={{ margin: 0, fontSize: 24, color: "#2f241e" }}>Camioneros</h2>
-              <p style={{ margin: 0, color: "#68594f", lineHeight: 1.5 }}>Qué viajes cargó cada camionero, con sus kilómetros y valor.</p>
+              <p style={{ margin: 0, color: "#68594f", lineHeight: 1.5 }}>Elegí un camionero para ver sus viajes: los que te mandó para aprobar y los ya aprobados.</p>
             </div>
-            <div style={{ display: "grid", gap: 18, marginTop: 16 }}>
-              {tripsLoading && !tripsLoaded ? (
-                <p style={{ margin: 0, color: "#68594f" }}>Cargando...</p>
-              ) : driverGroups.length === 0 ? (
-                <p style={{ margin: 0, color: "#68594f" }}>Todavía ningún camionero cargó viajes.</p>
-              ) : (
-                driverGroups.map(([name, driverTrips]) => {
-                  const pendingPay = driverTrips.filter((trip) => trip.kilometers > 0 && !trip.driverPaidAt);
-                  const pendingAmount = pendingPay.reduce((sum, trip) => sum + ((getTripPricing(trip).totalAmount ?? 0) * DRIVER_PERCENT) / 100, 0);
-                  const driverUserId = driverTrips[0].userId;
-                  return (
-                  <div key={name} style={{ display: "grid", gap: 10 }}>
-                    <h3 style={{ margin: 0, fontSize: 19, color: "#2f241e" }}>
-                      {name} <span style={{ color: "#68594f", fontSize: 14, fontWeight: 500 }}>· {driverTrips.length} viaje{driverTrips.length === 1 ? "" : "s"}</span>
-                    </h3>
-                    <div style={filterTotalStyle}>
-                      <span style={tripTotalLabelStyle}>A pagarle ({DRIVER_PERCENT}%) · {pendingPay.length} viaje{pendingPay.length === 1 ? "" : "s"}</span>
-                      <strong style={tripMoneyStyle}>{formatMoneyLabel(pendingAmount)}</strong>
-                      {pendingPay.length > 0 ? (
-                        <button
-                          type="button"
-                          disabled={payingDriver === driverUserId}
-                          style={miniActionButtonStyle}
-                          onClick={() => {
-                            if (!window.confirm(`¿Marcar como pagado a ${name}? Son ${formatMoneyLabel(pendingAmount)} por ${pendingPay.length} viaje(s).`)) return;
-                            setPayingDriver(driverUserId);
-                            void payoutCamionesDriver(driverUserId)
-                              .then(() => toast.success("Pago registrado ✔"))
-                              .catch(() => toast.error("No se pudo registrar el pago"))
-                              .finally(() => {
-                                setPayingDriver(null);
-                                void refreshTrips();
-                              });
-                          }}
-                        >
-                          Marcar pagado
-                        </button>
-                      ) : null}
+            {tripsLoading && !tripsLoaded ? (
+              <p style={{ margin: "16px 0 0", color: "#68594f" }}>Cargando...</p>
+            ) : driverGroups.length === 0 ? (
+              <p style={{ margin: "16px 0 0", color: "#68594f" }}>Todavía ningún camionero cargó viajes.</p>
+            ) : (
+              (() => {
+                const current = driverGroups.find(([name]) => name === selectedDriver) ?? driverGroups[0];
+                const [name, driverTrips] = current;
+                const toApprove = driverTrips.filter((trip) => trip.kilometers <= 0);
+                const approved = driverTrips.filter((trip) => trip.kilometers > 0);
+                const pendingPay = approved.filter((trip) => !trip.driverPaidAt);
+                const pendingAmount = pendingPay.reduce((sum, trip) => sum + ((getTripPricing(trip).totalAmount ?? 0) * DRIVER_PERCENT) / 100, 0);
+                const driverUserId = driverTrips[0].userId;
+                return (
+                  <div style={{ display: "grid", gap: 14, marginTop: 16 }}>
+                    <div style={filterWrapStyle}>
+                      {driverGroups.map(([driverName, list]) => {
+                        const waiting = list.filter((trip) => trip.kilometers <= 0).length;
+                        return (
+                          <button
+                            key={driverName}
+                            type="button"
+                            onClick={() => setSelectedDriver(driverName)}
+                            style={driverName === name ? activeChipStyle : chipStyle}
+                          >
+                            {driverName}
+                            {waiting > 0 ? ` (${waiting})` : ""}
+                          </button>
+                        );
+                      })}
                     </div>
-                    {driverTrips.map((trip) => {
+
+                    <h3 style={{ margin: 0, fontSize: 18, color: "#8a5a14" }}>Para aprobar ({toApprove.length})</h3>
+                    {toApprove.length === 0 ? <p style={{ margin: 0, color: "#68594f" }}>No hay viajes esperando tu aprobación.</p> : null}
+                    {toApprove.map((trip) => {
                       const meta = readTripMeta(trip.notes);
                       const route = getTripRouteParts(trip);
-                      const valued = trip.kilometers > 0;
                       return (
-                        <article key={trip.id} style={tripCardStyle}>
+                        <article key={trip.id} style={{ ...tripCardStyle, border: "1px solid #e3c27a", background: "linear-gradient(180deg, #fff8e6 0%, #fdeec6 100%)" }}>
                           <div style={tripCardTopRowStyle}>
                             <strong style={{ color: "#2f241e" }}>{trip.clientName}</strong>
                             <span style={{ color: "#68594f", fontSize: 13 }}>{formatDateLabel(trip.tripDate)}</span>
@@ -1896,28 +1891,76 @@ export function CamionesHomePage() {
                             {trip.truck === "mercedes" ? "Mercedes" : trip.truck === "volkswagen" ? "Volkswagen" : "Camión sin asignar"}
                             {meta.trailer === "si" ? " · con zorra" : meta.trailer === "no" ? " · sin zorra" : ""}
                           </div>
-                          <div style={{ color: "#2f241e", fontSize: 14, fontWeight: 600 }}>
-                            {valued
-                              ? `${trip.kilometers} km${meta.totalAmount !== null ? ` · ${formatMoneyLabel(meta.totalAmount)}` : ""}`
-                              : "Por valorar"}
-                            {valued ? (trip.driverPaidAt ? ` · pagado ${formatDateLabel(trip.driverPaidAt)}` : ` · a pagarle ${formatMoneyLabel(((getTripPricing(trip).totalAmount ?? 0) * DRIVER_PERCENT) / 100)}`) : ""}
+                          {meta.description ? <p style={tripDescriptionStyle}>{meta.description}</p> : null}
+                          <div>
+                            <button type="button" onClick={() => openTripDetailsModal(trip)} style={miniActionButtonStyle}>
+                              Poner valor y aprobar
+                            </button>
+                          </div>
+                        </article>
+                      );
+                    })}
+
+                    <h3 style={{ margin: "6px 0 0", fontSize: 18, color: "#1f6b34" }}>Aprobados ({approved.length})</h3>
+                    {approved.length > 0 ? (
+                      <div style={filterTotalStyle}>
+                        <span style={tripTotalLabelStyle}>
+                          A pagarle a {name} ({DRIVER_PERCENT}%) · {pendingPay.length} viaje{pendingPay.length === 1 ? "" : "s"}
+                        </span>
+                        <strong style={tripMoneyStyle}>{formatMoneyLabel(pendingAmount)}</strong>
+                        {pendingPay.length > 0 ? (
+                          <button
+                            type="button"
+                            disabled={payingDriver === driverUserId}
+                            style={miniActionButtonStyle}
+                            onClick={() => {
+                              if (!window.confirm(`¿Marcar como pagado a ${name}? Son ${formatMoneyLabel(pendingAmount)} por ${pendingPay.length} viaje(s).`)) return;
+                              setPayingDriver(driverUserId);
+                              void payoutCamionesDriver(driverUserId)
+                                .then(() => toast.success("Pago registrado ✔"))
+                                .catch(() => toast.error("No se pudo registrar el pago"))
+                                .finally(() => {
+                                  setPayingDriver(null);
+                                  void refreshTrips();
+                                });
+                            }}
+                          >
+                            Marcar pagado
+                          </button>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <p style={{ margin: 0, color: "#68594f" }}>Todavía no aprobaste ningún viaje.</p>
+                    )}
+                    {approved.map((trip) => {
+                      const meta = readTripMeta(trip.notes);
+                      const route = getTripRouteParts(trip);
+                      const share = ((getTripPricing(trip).totalAmount ?? 0) * DRIVER_PERCENT) / 100;
+                      return (
+                        <article key={trip.id} style={{ ...tripCardStyle, border: "1px solid #9bd0a8", background: "linear-gradient(180deg, #f1fbf3 0%, #dff3e4 100%)" }}>
+                          <div style={tripCardTopRowStyle}>
+                            <strong style={{ color: "#2f241e" }}>{trip.clientName}</strong>
+                            <span style={{ color: "#68594f", fontSize: 13 }}>{formatDateLabel(trip.tripDate)}</span>
+                          </div>
+                          <div style={{ color: "#2f241e" }}>
+                            {route.from} → {route.to}
+                          </div>
+                          <div style={{ color: "#68594f", fontSize: 14 }}>
+                            {trip.truck === "mercedes" ? "Mercedes" : trip.truck === "volkswagen" ? "Volkswagen" : "Camión sin asignar"}
+                            {meta.trailer === "si" ? " · con zorra" : meta.trailer === "no" ? " · sin zorra" : ""}
+                          </div>
+                          <div style={{ color: "#1f6b34", fontSize: 14, fontWeight: 700 }}>
+                            {trip.kilometers} km{meta.totalAmount !== null || getTripPricing(trip).totalAmount !== null ? ` · ${formatMoneyLabel(getTripPricing(trip).totalAmount ?? 0)}` : ""}
+                            {trip.driverPaidAt ? ` · pagado ${formatDateLabel(trip.driverPaidAt)}` : ` · a pagarle ${formatMoneyLabel(share)}`}
                           </div>
                           {meta.description ? <p style={tripDescriptionStyle}>{meta.description}</p> : null}
-                          {!valued ? (
-                            <div>
-                              <button type="button" onClick={() => openTripDetailsModal(trip)} style={miniActionButtonStyle}>
-                                Poner valor
-                              </button>
-                            </div>
-                          ) : null}
                         </article>
                       );
                     })}
                   </div>
-                  );
-                })
-              )}
-            </div>
+                );
+              })()
+            )}
           </section>
         ) : null}
 
