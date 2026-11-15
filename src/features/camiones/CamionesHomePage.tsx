@@ -18,7 +18,7 @@ import {
 import { CamionesClient, CamionesPlace, CamionesTrip, CamionesTruck } from "./camiones.types";
 import { CamionesMonthTab, type CamionesMonthItem } from "./CamionesMonthTab";
 
-type CamionesTab = "cliente" | "viaje" | "registro" | "localidad" | "panel" | "mes" | "valorar";
+type CamionesTab = "cliente" | "viaje" | "registro" | "localidad" | "panel" | "mes" | "valorar" | "camioneros";
 type ClientModalState = { mode: "create" | "edit"; clientId: number | null } | null;
 type PlaceModalState = { mode: "create" | "edit"; placeId: number | null } | null;
 type TripModalState = { tripId: number } | null;
@@ -218,6 +218,16 @@ export function CamionesHomePage() {
   // valorar"): no entran a Pagos / Panel / Mes hasta que el administrador
   // les pone km y valor.
   const trips = useMemo(() => allTrips.filter((trip) => trip.kilometers > 0), [allTrips]);
+  // Pestaña "Camioneros": lo que cargó cada camionero, valorado o no.
+  const driverGroups = useMemo(() => {
+    const groups = new Map<string, CamionesTrip[]>();
+    for (const trip of allTrips) {
+      if (!trip.createdByIsDriver || trip.status === "cancelled") continue;
+      const name = trip.createdByName ?? "Camionero";
+      groups.set(name, [...(groups.get(name) ?? []), trip]);
+    }
+    return Array.from(groups.entries());
+  }, [allTrips]);
   const unvaluedTrips = useMemo(
     () => allTrips.filter((trip) => trip.kilometers <= 0 && trip.status !== "cancelled"),
     [allTrips]
@@ -1354,6 +1364,9 @@ export function CamionesHomePage() {
           <button type="button" onClick={() => setTab("registro")} style={tab === "registro" ? activeTabStyle : tabStyle}>
             Pagos
           </button>
+          <button type="button" onClick={() => setTab("camioneros")} style={tab === "camioneros" ? activeTabStyle : tabStyle}>
+            Camioneros
+          </button>
           {unvaluedTrips.length > 0 || tab === "valorar" ? (
             <button type="button" onClick={() => setTab("valorar")} style={tab === "valorar" ? activeTabStyle : tabStyle}>
               Por valorar ({unvaluedTrips.length})
@@ -1820,6 +1833,63 @@ export function CamionesHomePage() {
                   </button>
                 </div>
               </div>
+            </div>
+          </section>
+        ) : null}
+
+        {tab === "camioneros" ? (
+          <section style={panelStyle}>
+            <div style={{ display: "grid", gap: 8 }}>
+              <h2 style={{ margin: 0, fontSize: 24, color: "#2f241e" }}>Camioneros</h2>
+              <p style={{ margin: 0, color: "#68594f", lineHeight: 1.5 }}>Qué viajes cargó cada camionero, con sus kilómetros y valor.</p>
+            </div>
+            <div style={{ display: "grid", gap: 18, marginTop: 16 }}>
+              {tripsLoading && !tripsLoaded ? (
+                <p style={{ margin: 0, color: "#68594f" }}>Cargando...</p>
+              ) : driverGroups.length === 0 ? (
+                <p style={{ margin: 0, color: "#68594f" }}>Todavía ningún camionero cargó viajes.</p>
+              ) : (
+                driverGroups.map(([name, driverTrips]) => (
+                  <div key={name} style={{ display: "grid", gap: 10 }}>
+                    <h3 style={{ margin: 0, fontSize: 19, color: "#2f241e" }}>
+                      {name} <span style={{ color: "#68594f", fontSize: 14, fontWeight: 500 }}>· {driverTrips.length} viaje{driverTrips.length === 1 ? "" : "s"}</span>
+                    </h3>
+                    {driverTrips.map((trip) => {
+                      const meta = readTripMeta(trip.notes);
+                      const route = getTripRouteParts(trip);
+                      const valued = trip.kilometers > 0;
+                      return (
+                        <article key={trip.id} style={tripCardStyle}>
+                          <div style={tripCardTopRowStyle}>
+                            <strong style={{ color: "#2f241e" }}>{trip.clientName}</strong>
+                            <span style={{ color: "#68594f", fontSize: 13 }}>{formatDateLabel(trip.tripDate)}</span>
+                          </div>
+                          <div style={{ color: "#2f241e" }}>
+                            {route.from} → {route.to}
+                          </div>
+                          <div style={{ color: "#68594f", fontSize: 14 }}>
+                            {trip.truck === "mercedes" ? "Mercedes" : trip.truck === "volkswagen" ? "Volkswagen" : "Camión sin asignar"}
+                            {meta.trailer === "si" ? " · con zorra" : meta.trailer === "no" ? " · sin zorra" : ""}
+                          </div>
+                          <div style={{ color: "#2f241e", fontSize: 14, fontWeight: 600 }}>
+                            {valued
+                              ? `${trip.kilometers} km${meta.totalAmount !== null ? ` · ${formatMoneyLabel(meta.totalAmount)}` : ""}`
+                              : "Por valorar"}
+                          </div>
+                          {meta.description ? <p style={tripDescriptionStyle}>{meta.description}</p> : null}
+                          {!valued ? (
+                            <div>
+                              <button type="button" onClick={() => openTripDetailsModal(trip)} style={miniActionButtonStyle}>
+                                Poner valor
+                              </button>
+                            </div>
+                          ) : null}
+                        </article>
+                      );
+                    })}
+                  </div>
+                ))
+              )}
             </div>
           </section>
         ) : null}
