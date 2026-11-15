@@ -62,7 +62,8 @@ export function CamionesDriverPage() {
 
   const filteredClients = useMemo(() => {
     const query = clientSearch.trim().toLowerCase();
-    if (!query) return clients;
+    // Sin texto no se muestra ninguna lista: el camionero tiene que buscar.
+    if (!query) return [];
     return clients.filter((item) => item.name.toLowerCase().includes(query));
   }, [clientSearch, clients]);
 
@@ -150,7 +151,8 @@ export function CamionesDriverPage() {
                     {item.name}
                   </button>
                 ))}
-                {!clientsLoading && filteredClients.length === 0 ? (
+                {!clientsLoading && !clientSearch.trim() ? <div style={emptyBoxStyle}>Escribí el nombre del cliente para buscarlo.</div> : null}
+                {!clientsLoading && clientSearch.trim() && filteredClients.length === 0 ? (
                   <div style={emptyBoxStyle}>No hay clientes para esa busqueda. Avisale al administrador.</div>
                 ) : null}
               </div>
