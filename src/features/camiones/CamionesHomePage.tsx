@@ -1846,9 +1846,24 @@ export function CamionesHomePage() {
               </p>
             </div>
             <div style={{ ...filterWrapStyle, marginTop: 12 }}>
-              <button type="button" onClick={() => setDriverView("choferes")} style={driverView === "choferes" ? activeChipStyle : chipStyle}>
-                Choferes
-              </button>
+              {driverGroups.map(([driverName, list]) => {
+                const waiting = list.filter((trip) => trip.kilometers <= 0).length;
+                const isActive = driverView === "choferes" && (selectedDriver ?? driverGroups[0][0]) === driverName;
+                return (
+                  <button
+                    key={driverName}
+                    type="button"
+                    onClick={() => {
+                      setSelectedDriver(driverName);
+                      setDriverView("choferes");
+                    }}
+                    style={isActive ? activeChipStyle : chipStyle}
+                  >
+                    {driverName}
+                    {waiting > 0 ? ` (${waiting})` : ""}
+                  </button>
+                );
+              })}
               <button type="button" onClick={() => setDriverView("historial")} style={driverView === "historial" ? activeChipStyle : chipStyle}>
                 Historial
               </button>
@@ -1957,18 +1972,6 @@ export function CamionesHomePage() {
                 };
                 return (
                   <div style={{ display: "grid", gap: 14, marginTop: 16 }}>
-                    <div style={filterWrapStyle}>
-                      {driverGroups.map(([driverName, list]) => {
-                        const waiting = list.filter((trip) => trip.kilometers <= 0).length;
-                        return (
-                          <button key={driverName} type="button" onClick={() => setSelectedDriver(driverName)} style={driverName === name ? activeChipStyle : chipStyle}>
-                            {driverName}
-                            {waiting > 0 ? ` (${waiting})` : ""}
-                          </button>
-                        );
-                      })}
-                    </div>
-
                     <h3 style={{ margin: 0, fontSize: 18, color: "#8a5a14" }}>Para aprobar ({toApprove.length})</h3>
                     {toApprove.length === 0 ? <p style={{ margin: 0, color: "#68594f" }}>No hay viajes esperando tu aprobación.</p> : null}
                     {toApprove.map((trip) => (
