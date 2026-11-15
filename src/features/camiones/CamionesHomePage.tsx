@@ -19,7 +19,7 @@ import {
 import { CamionesClient, CamionesPlace, CamionesTrip, CamionesTruck } from "./camiones.types";
 import { CamionesMonthTab, type CamionesMonthItem } from "./CamionesMonthTab";
 
-type CamionesTab = "cliente" | "viaje" | "registro" | "localidad" | "panel" | "mes" | "valorar" | "camioneros";
+type CamionesTab = "cliente" | "viaje" | "registro" | "localidad" | "panel" | "mes" | "camioneros";
 type ClientModalState = { mode: "create" | "edit"; clientId: number | null } | null;
 type PlaceModalState = { mode: "create" | "edit"; placeId: number | null } | null;
 type TripModalState = { tripId: number } | null;
@@ -1351,6 +1351,7 @@ export function CamionesHomePage() {
               variant="dark"
               showDashboardLink={false}
               menuActions={[
+                { label: unvaluedTrips.length > 0 ? `Camioneros (${unvaluedTrips.length} por valorar)` : "Camioneros", onSelect: () => setTab("camioneros") },
                 { label: "Panel", onSelect: () => setTab("panel") },
                 { label: "Mes", onSelect: () => setTab("mes") }
               ]}
@@ -1368,14 +1369,6 @@ export function CamionesHomePage() {
           <button type="button" onClick={() => setTab("registro")} style={tab === "registro" ? activeTabStyle : tabStyle}>
             Pagos
           </button>
-          <button type="button" onClick={() => setTab("camioneros")} style={tab === "camioneros" ? activeTabStyle : tabStyle}>
-            Camioneros
-          </button>
-          {unvaluedTrips.length > 0 || tab === "valorar" ? (
-            <button type="button" onClick={() => setTab("valorar")} style={tab === "valorar" ? activeTabStyle : tabStyle}>
-              Por valorar ({unvaluedTrips.length})
-            </button>
-          ) : null}
         </section>
 
         {tab === "mes" ? <CamionesMonthTab items={monthItems} loading={tripsLoading && !tripsLoaded} formatMoney={formatMoneyLabel} /> : null}
@@ -1921,51 +1914,6 @@ export function CamionesHomePage() {
                       );
                     })}
                   </div>
-                  );
-                })
-              )}
-            </div>
-          </section>
-        ) : null}
-
-        {tab === "valorar" ? (
-          <section style={panelStyle}>
-            <div style={{ display: "grid", gap: 8 }}>
-              <h2 style={{ margin: 0, fontSize: 24, color: "#2f241e" }}>Por valorar</h2>
-              <p style={{ margin: 0, color: "#68594f", lineHeight: 1.5 }}>
-                Viajes que cargaron los camioneros. Tocá uno y poné los kilómetros y el valor.
-              </p>
-            </div>
-            <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
-              {tripsLoading && !tripsLoaded ? (
-                <p style={{ margin: 0, color: "#68594f" }}>Cargando...</p>
-              ) : unvaluedTrips.length === 0 ? (
-                <p style={{ margin: 0, color: "#68594f" }}>No hay viajes por valorar. 🎉</p>
-              ) : (
-                unvaluedTrips.map((trip) => {
-                  const meta = readTripMeta(trip.notes);
-                  const route = getTripRouteParts(trip);
-                  return (
-                    <article key={trip.id} style={tripCardStyle}>
-                      <div style={tripCardTopRowStyle}>
-                        <strong style={{ color: "#2f241e" }}>{trip.clientName}</strong>
-                        <span style={{ color: "#68594f", fontSize: 13 }}>{formatDateLabel(trip.tripDate)}</span>
-                      </div>
-                      <div style={{ color: "#2f241e" }}>
-                        {route.from} → {route.to}
-                      </div>
-                      <div style={{ color: "#68594f", fontSize: 14 }}>
-                        {trip.truck === "mercedes" ? "Mercedes" : trip.truck === "volkswagen" ? "Volkswagen" : "Camión sin asignar"}
-                        {meta.trailer === "si" ? " · con zorra" : meta.trailer === "no" ? " · sin zorra" : ""}
-                        {trip.createdByName ? ` · cargó ${trip.createdByName}` : ""}
-                      </div>
-                      {meta.description ? <p style={tripDescriptionStyle}>{meta.description}</p> : null}
-                      <div>
-                        <button type="button" onClick={() => openTripDetailsModal(trip)} style={miniActionButtonStyle}>
-                          Poner valor
-                        </button>
-                      </div>
-                    </article>
                   );
                 })
               )}
