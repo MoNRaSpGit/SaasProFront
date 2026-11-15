@@ -19,6 +19,7 @@ import {
 } from "./camiones.client";
 import { CamionesClient, CamionesPlace, CamionesTrip, CamionesTruck } from "./camiones.types";
 import { CamionesMonthTab, type CamionesMonthItem } from "./CamionesMonthTab";
+import { ExpandableList } from "./ExpandableList";
 
 type CamionesTab = "cliente" | "viaje" | "registro" | "localidad" | "panel" | "mes" | "camioneros";
 type ClientModalState = { mode: "create" | "edit"; clientId: number | null } | null;
@@ -681,7 +682,8 @@ export function CamionesHomePage() {
             amount: financials.totalAmount ?? 0,
             collected: financials.collectedAmount,
             kilometers: trip.kilometers,
-            truck: trip.truck
+            truck: trip.truck,
+            byDriver: Boolean(trip.createdByIsDriver)
           };
         }),
     [trips]
@@ -1376,6 +1378,32 @@ export function CamionesHomePage() {
           </button>
         </section>
 
+        {unvaluedTrips.length > 0 && tab !== "camioneros" ? (
+          <button
+            type="button"
+            onClick={() => {
+              setDriverView("choferes");
+              setTab("camioneros");
+            }}
+            style={{
+              marginTop: 12,
+              width: "100%",
+              minHeight: 48,
+              padding: "10px 14px",
+              borderRadius: 18,
+              border: "1px solid #e3c27a",
+              background: "#fdeec6",
+              color: "#7a5a12",
+              fontWeight: 800,
+              fontSize: 15,
+              cursor: "pointer",
+              textAlign: "left"
+            }}
+          >
+            🔔 {unvaluedTrips.length} viaje{unvaluedTrips.length === 1 ? "" : "s"} de camioneros esperando tu aprobación →
+          </button>
+        ) : null}
+
         {tab === "mes" ? <CamionesMonthTab items={monthItems} loading={tripsLoading && !tripsLoaded} formatMoney={formatMoneyLabel} /> : null}
 
         {tab === "cliente" ? (
@@ -1907,7 +1935,9 @@ export function CamionesHomePage() {
                       <strong style={tripMoneyStyle}>{formatMoneyLabel(totalAmount)}</strong>
                     </div>
                     {rows.length === 0 ? <p style={{ margin: 0, color: "#68594f" }}>Todavía no pagaste ningún viaje.</p> : null}
-                    {rows.map((row) => (
+                    <ExpandableList
+                      items={rows}
+                      render={(row) => (
                       <details key={row.key} style={{ ...tripCardStyle, border: "1px solid #b7c9e8", background: "linear-gradient(180deg, #f4f8fe 0%, #e4edfa 100%)" }}>
                         <summary style={{ cursor: "pointer", display: "flex", justifyContent: "space-between", gap: 10, fontWeight: 700, color: "#2f241e" }}>
                           <span>
@@ -1933,7 +1963,8 @@ export function CamionesHomePage() {
                           })}
                         </div>
                       </details>
-                    ))}
+                      )}
+                    />
                   </div>
                 );
               })()
@@ -1976,40 +2007,46 @@ export function CamionesHomePage() {
                   <div style={{ display: "grid", gap: 14, marginTop: 16 }}>
                     <h3 style={{ margin: 0, fontSize: 18, color: "#8a5a14" }}>Para aprobar ({toApprove.length})</h3>
                     {toApprove.length === 0 ? <p style={{ margin: 0, color: "#68594f" }}>No hay viajes esperando tu aprobación.</p> : null}
-                    {toApprove.map((trip) => (
-                      <article key={trip.id} style={{ ...tripCardStyle, border: "1px solid #e3c27a", background: "linear-gradient(180deg, #fff8e6 0%, #fdeec6 100%)" }}>
-                        {cardBody(trip)}
-                        <div>
-                          <button type="button" onClick={() => openTripDetailsModal(trip)} style={miniActionButtonStyle}>
-                            Poner valor y aprobar
-                          </button>
-                        </div>
-                      </article>
-                    ))}
+                    <ExpandableList
+                      items={toApprove}
+                      render={(trip) => (
+                        <article key={trip.id} style={{ ...tripCardStyle, border: "1px solid #e3c27a", background: "linear-gradient(180deg, #fff8e6 0%, #fdeec6 100%)" }}>
+                          {cardBody(trip)}
+                          <div>
+                            <button type="button" onClick={() => openTripDetailsModal(trip)} style={miniActionButtonStyle}>
+                              Poner valor y aprobar
+                            </button>
+                          </div>
+                        </article>
+                      )}
+                    />
 
                     <h3 style={{ margin: "6px 0 0", fontSize: 18, color: "#1f6b34" }}>Aprobados · en curso ({inProgress.length})</h3>
                     {inProgress.length === 0 ? <p style={{ margin: 0, color: "#68594f" }}>Ningún viaje en curso.</p> : null}
-                    {inProgress.map((trip) => (
-                      <article key={trip.id} style={{ ...tripCardStyle, border: "1px solid #b9d9c1", background: "linear-gradient(180deg, #f7fcf8 0%, #e9f6ec 100%)" }}>
-                        {cardBody(trip)}
-                        <div>
-                          <button
-                            type="button"
-                            style={miniActionButtonStyle}
-                            onClick={() =>
-                              void finishCamionesTrip(trip.id)
-                                .then(() => {
-                                  toast.success("Viaje marcado como terminado");
-                                  void refreshTrips();
-                                })
-                                .catch(() => toast.error("No se pudo marcar terminado"))
-                            }
-                          >
-                            Marcar terminado
-                          </button>
-                        </div>
-                      </article>
-                    ))}
+                    <ExpandableList
+                      items={inProgress}
+                      render={(trip) => (
+                        <article key={trip.id} style={{ ...tripCardStyle, border: "1px solid #b9d9c1", background: "linear-gradient(180deg, #f7fcf8 0%, #e9f6ec 100%)" }}>
+                          {cardBody(trip)}
+                          <div>
+                            <button
+                              type="button"
+                              style={miniActionButtonStyle}
+                              onClick={() =>
+                                void finishCamionesTrip(trip.id)
+                                  .then(() => {
+                                    toast.success("Viaje marcado como terminado");
+                                    void refreshTrips();
+                                  })
+                                  .catch(() => toast.error("No se pudo marcar terminado"))
+                              }
+                            >
+                              Marcar terminado
+                            </button>
+                          </div>
+                        </article>
+                      )}
+                    />
 
                     <h3 style={{ margin: "6px 0 0", fontSize: 18, color: "#1f6b34" }}>Terminados · para pagar ({finished.length})</h3>
                     {finished.length > 0 ? (
@@ -2030,11 +2067,14 @@ export function CamionesHomePage() {
                     ) : (
                       <p style={{ margin: 0, color: "#68594f" }}>Nada para pagar por ahora.</p>
                     )}
-                    {finished.map((trip) => (
-                      <article key={trip.id} style={{ ...tripCardStyle, border: "1px solid #7fc08f", background: "linear-gradient(180deg, #e9f8ed 0%, #cdeed6 100%)" }}>
-                        {cardBody(trip)}
-                      </article>
-                    ))}
+                    <ExpandableList
+                      items={finished}
+                      render={(trip) => (
+                        <article key={trip.id} style={{ ...tripCardStyle, border: "1px solid #7fc08f", background: "linear-gradient(180deg, #e9f8ed 0%, #cdeed6 100%)" }}>
+                          {cardBody(trip)}
+                        </article>
+                      )}
+                    />
                   </div>
                 );
               })()

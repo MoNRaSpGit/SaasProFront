@@ -12,6 +12,8 @@ export type CamionesMonthItem = {
   collected: number;
   kilometers: number;
   truck: "mercedes" | "volkswagen" | null;
+  // true = lo cargo un camionero (solo esos pagan el 10% del chofer).
+  byDriver?: boolean;
 };
 
 // Porcentaje del chofer sobre lo que factura su camion (06/11/2026, pedido
@@ -103,7 +105,8 @@ export function CamionesMonthTab({ items, loading, formatMoney }: Props) {
     const sum = (list: CamionesMonthItem[]) => ({
       trips: list.length,
       kilometers: list.reduce((total, item) => total + item.kilometers, 0),
-      amount: list.reduce((total, item) => total + item.amount, 0)
+      amount: list.reduce((total, item) => total + item.amount, 0),
+      driverAmount: list.filter((item) => item.byDriver).reduce((total, item) => total + item.amount, 0)
     });
     return {
       trucks: TRUCKS.map((truck) => ({ ...truck, ...sum(monthItems.filter((item) => item.truck === truck.key)) })),
@@ -176,8 +179,8 @@ export function CamionesMonthTab({ items, loading, formatMoney }: Props) {
                     </span>
                   </div>
                   <div style={{ display: "grid", textAlign: "right" }}>
-                    <span style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.06em", color: "#8a5a14" }}>Chofer {DRIVER_PERCENT}%</span>
-                    <strong style={{ fontSize: 20, color: "#8a5a14" }}>{formatMoney((truck.amount * DRIVER_PERCENT) / 100)}</strong>
+                    <span style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.06em", color: "#8a5a14" }}>Camioneros {DRIVER_PERCENT}%</span>
+                    <strong style={{ fontSize: 20, color: "#8a5a14" }}>{formatMoney((truck.driverAmount * DRIVER_PERCENT) / 100)}</strong>
                   </div>
                 </div>
               </article>

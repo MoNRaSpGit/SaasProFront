@@ -3,6 +3,7 @@ import { toast } from "react-toastify";
 import { ModelUserMenu } from "../../shared/components/ModelUserMenu";
 import { listCamionesClients, listCamionesPlaces, listMyCamionesTrips, submitCamionesDriverTrip, finishMyCamionesTrip, type CamionesMyTrip } from "./camiones.client";
 import type { CamionesClient, CamionesPlace, CamionesTruck } from "./camiones.types";
+import { ExpandableList } from "./ExpandableList";
 
 // Pantalla del CAMIONERO (rehecha 15/11/2026, mismo formato que la del
 // administrador): pestañas Cliente -> Viaje -> Mis viajes. Elige el cliente,
@@ -160,11 +161,14 @@ export function CamionesDriverPage() {
               </label>
               <div style={{ display: "grid", gap: 8, alignContent: "start" }}>
                 {clientsLoading ? <div style={emptyBoxStyle}>Cargando clientes...</div> : null}
-                {filteredClients.map((item) => (
-                  <button key={item.id} type="button" onClick={() => selectClient(item)} style={client?.id === item.id ? selectedButtonStyle : pickerButtonStyle}>
-                    {item.name}
-                  </button>
-                ))}
+                <ExpandableList
+                  items={filteredClients}
+                  render={(item) => (
+                    <button key={item.id} type="button" onClick={() => selectClient(item)} style={client?.id === item.id ? selectedButtonStyle : pickerButtonStyle}>
+                      {item.name}
+                    </button>
+                  )}
+                />
                 {!clientsLoading && !clientSearch.trim() ? <div style={emptyBoxStyle}>Escribí el nombre del cliente para buscarlo.</div> : null}
                 {!clientsLoading && clientSearch.trim() && filteredClients.length === 0 ? (
                   <div style={emptyBoxStyle}>No hay clientes para esa busqueda. Avisale al administrador.</div>
@@ -258,16 +262,12 @@ export function CamionesDriverPage() {
               {historyView === "pendientes" ? (
                 <>
                   {pendingTrips.length === 0 ? <div style={emptyBoxStyle}>No tenés viajes pendientes.</div> : null}
-                  {pendingTrips.slice(0, 40).map((trip) => (
-                    <TripCard key={trip.id} trip={trip} onFinish={() => void handleFinish(trip.id)} />
-                  ))}
+                  <ExpandableList items={pendingTrips} render={(trip) => <TripCard key={trip.id} trip={trip} onFinish={() => void handleFinish(trip.id)} />} />
                 </>
               ) : (
                 <>
                   {paidTrips.length === 0 ? <div style={emptyBoxStyle}>Todavía no tenés viajes pagados.</div> : null}
-                  {paidTrips.slice(0, 40).map((trip) => (
-                    <TripCard key={trip.id} trip={trip} />
-                  ))}
+                  <ExpandableList items={paidTrips} render={(trip) => <TripCard key={trip.id} trip={trip} />} />
                 </>
               )}
             </div>
