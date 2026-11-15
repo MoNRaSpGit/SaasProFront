@@ -223,6 +223,8 @@ export function CamionesHomePage() {
   // les pone km y valor.
   const trips = useMemo(() => allTrips.filter((trip) => trip.kilometers > 0), [allTrips]);
   const [payingDriver, setPayingDriver] = useState<number | null>(null);
+  // Modal propio para confirmar el pago al camionero (en vez del confirm de Windows).
+  const [payConfirm, setPayConfirm] = useState<{ userId: number; name: string; amount: number; trips: CamionesTrip[] } | null>(null);
   const [selectedDriver, setSelectedDriver] = useState<string | null>(null);
   const [driverView, setDriverView] = useState<"choferes" | "historial">("choferes");
   // Pestaña "Camioneros": lo que cargó cada camionero, valorado o no.
@@ -2020,17 +2022,7 @@ export function CamionesHomePage() {
                           type="button"
                           disabled={payingDriver === driverUserId}
                           style={miniActionButtonStyle}
-                          onClick={() => {
-                            if (!window.confirm(`¿Marcar como pagado a ${name}? Son ${formatMoneyLabel(pendingAmount)} por ${finished.length} viaje(s).`)) return;
-                            setPayingDriver(driverUserId);
-                            void payoutCamionesDriver(driverUserId)
-                              .then(() => toast.success("Pago registrado ✔ (pasó al historial)"))
-                              .catch(() => toast.error("No se pudo registrar el pago"))
-                              .finally(() => {
-                                setPayingDriver(null);
-                                void refreshTrips();
-                              });
-                          }}
+                          onClick={() => setPayConfirm({ userId: driverUserId, name, amount: pendingAmount, trips: finished })}
                         >
                           Pagar
                         </button>
@@ -2490,6 +2482,61 @@ export function CamionesHomePage() {
                 disabled={savingTripEdit}
               >
                 {savingTripEdit ? "Guardando..." : "Guardar viaje"}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {payConfirm ? (
+        <div style={modalOverlayStyle} onClick={() => (payingDriver === null ? setPayConfirm(null) : undefined)}>
+          <section style={confirmModalCardStyle} onClick={(event) => event.stopPropagation()}>
+            <div style={{ display: "grid", gap: 10 }}>
+              <h3 style={{ margin: 0, fontSize: 24, color: "#2f241e" }}>¿Pagarle a {payConfirm.name}?</h3>
+              <p style={{ margin: 0, color: "#68594f", lineHeight: 1.5 }}>
+                Vas a registrar el pago de <strong>{formatMoneyLabel(payConfirm.amount)}</strong> por{" "}
+                <strong>
+                  {payConfirm.trips.length} viaje{payConfirm.trips.length === 1 ? "" : "s"}
+                </strong>
+                . Pasan al historial y salen de esta pantalla.
+              </p>
+              <div style={{ display: "grid", gap: 6, maxHeight: 220, overflowY: "auto" }}>
+                {payConfirm.trips.map((trip) => {
+                  const route = getTripRouteParts(trip);
+                  return (
+                    <div key={trip.id} style={{ fontSize: 14, color: "#4c3d34", borderTop: "1px solid #eadfd1", paddingTop: 6 }}>
+                      <strong>{trip.clientName}</strong> · {route.from} → {route.to}
+                      <div style={{ color: "#68594f", fontSize: 13 }}>
+                        {formatDateLabel(trip.tripDate)} · {formatMoneyLabel(((getTripPricing(trip).totalAmount ?? 0) * DRIVER_PERCENT) / 100)}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div style={confirmActionsStyle}>
+              <button type="button" onClick={() => setPayConfirm(null)} style={modalCancelButtonStyle} disabled={payingDriver !== null}>
+                Cancelar
+              </button>
+              <button
+                type="button"
+                style={{ ...modalDangerButtonStyle, background: "#1f6b34", borderColor: "#1f6b34", color: "#fff" }}
+                disabled={payingDriver !== null}
+                onClick={() => {
+                  const target = payConfirm;
+                  setPayingDriver(target.userId);
+                  void payoutCamionesDriver(target.userId)
+                    .then(() => toast.success("Pago registrado ✔ (pasó al historial)"))
+                    .catch(() => toast.error("No se pudo registrar el pago"))
+                    .finally(() => {
+                      setPayingDriver(null);
+                      setPayConfirm(null);
+                      void refreshTrips();
+                    });
+                }}
+              >
+                {payingDriver !== null ? "Pagando..." : "Aceptar y pagar"}
               </button>
             </div>
           </section>
