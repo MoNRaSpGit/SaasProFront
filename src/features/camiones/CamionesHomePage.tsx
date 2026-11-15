@@ -1914,6 +1914,14 @@ export function CamionesHomePage() {
                 // Cada viaje pagado va por separado (15/11/2026, pedido explicito):
                 // "viaje 1: 1000, viaje 2: 2000", sin acumular. Lo acumulado va
                 // solo en el resumen por mes de arriba.
+                const palette = [
+                  { border: "#8fb4ec", bg: "linear-gradient(180deg, #f3f8ff 0%, #dbe9fd 100%)", accent: "#1d4ea0" },
+                  { border: "#e3a56b", bg: "linear-gradient(180deg, #fff6ec 0%, #fde1c4 100%)", accent: "#b45a0f" },
+                  { border: "#b79be0", bg: "linear-gradient(180deg, #f8f3ff 0%, #e6dafa 100%)", accent: "#6a3fb0" },
+                  { border: "#8fd0bf", bg: "linear-gradient(180deg, #f1fbf8 0%, #d3f0e7 100%)", accent: "#17795e" }
+                ];
+                const sortedNames = driverGroups.map(([driverName]) => driverName).sort((x, y) => x.localeCompare(y));
+                const colorOf = (driverName: string) => palette[Math.max(0, sortedNames.indexOf(driverName)) % palette.length];
                 const share = (trip: CamionesTrip) => ((getTripPricing(trip).totalAmount ?? 0) * DRIVER_PERCENT) / 100;
                 type PaidRow = { trip: CamionesTrip; driver: string; number: number; amount: number };
                 const paidRows: PaidRow[] = [];
@@ -1951,21 +1959,27 @@ export function CamionesHomePage() {
                         const [year, month] = monthKey.split("-");
                         const total = Array.from(perDriver.values()).reduce((sum, item) => sum + item.amount, 0);
                         return (
-                          <article key={monthKey} style={{ ...tripCardStyle, border: "1px solid #b7c9e8", background: "linear-gradient(180deg, #f4f8fe 0%, #e4edfa 100%)" }}>
+                          <article key={monthKey} style={tripCardStyle}>
                             <div style={tripCardTopRowStyle}>
                               <strong style={{ color: "#2f241e" }}>
                                 {monthNames[Number(month) - 1] ?? month} {year}
                               </strong>
-                              <strong style={{ color: "#1d4ea0" }}>{formatMoneyLabel(total)}</strong>
+                              <strong style={{ color: "#2f241e" }}>{formatMoneyLabel(total)}</strong>
                             </div>
-                            {Array.from(perDriver.entries()).map(([driverName, item]) => (
-                              <div key={driverName} style={{ display: "flex", justifyContent: "space-between", color: "#4c3d34", fontSize: 14 }}>
-                                <span>
-                                  {driverName} · {item.trips} viaje{item.trips === 1 ? "" : "s"}
-                                </span>
-                                <span>{formatMoneyLabel(item.amount)}</span>
-                              </div>
-                            ))}
+                            {Array.from(perDriver.entries()).map(([driverName, item]) => {
+                              const color = colorOf(driverName);
+                              return (
+                                <div
+                                  key={driverName}
+                                  style={{ display: "flex", justifyContent: "space-between", gap: 8, padding: "8px 10px", borderRadius: 12, border: `1px solid ${color.border}`, background: color.bg, color: color.accent, fontSize: 14, fontWeight: 700 }}
+                                >
+                                  <span>
+                                    {driverName} · {item.trips} viaje{item.trips === 1 ? "" : "s"}
+                                  </span>
+                                  <span>{formatMoneyLabel(item.amount)}</span>
+                                </div>
+                              );
+                            })}
                           </article>
                         );
                       }}
@@ -1976,13 +1990,14 @@ export function CamionesHomePage() {
                       items={paidRows}
                       render={(row) => {
                         const route = getTripRouteParts(row.trip);
+                        const color = colorOf(row.driver);
                         return (
-                          <article key={row.trip.id} style={{ ...tripCardStyle, border: "1px solid #b7c9e8", background: "linear-gradient(180deg, #f4f8fe 0%, #e4edfa 100%)" }}>
+                          <article key={row.trip.id} style={{ ...tripCardStyle, border: `1px solid ${color.border}`, background: color.bg }}>
                             <div style={tripCardTopRowStyle}>
-                              <strong style={{ color: "#2f241e" }}>
+                              <strong style={{ color: color.accent }}>
                                 {row.driver} · Viaje {row.number}
                               </strong>
-                              <strong style={{ color: "#1d4ea0" }}>{formatMoneyLabel(row.amount)}</strong>
+                              <strong style={{ color: color.accent }}>{formatMoneyLabel(row.amount)}</strong>
                             </div>
                             <div style={{ color: "#2f241e" }}>
                               {row.trip.clientName} · {route.from} → {route.to}
