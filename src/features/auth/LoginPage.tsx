@@ -19,8 +19,8 @@ const QUICK_ACCESS_ACCOUNTS: QuickAccessAccount[] = [
   {
     id: "admin",
     label: "Entrar como administrador",
-    identifier: "lamilagrosa@saaspro.local",
-    password: "$1994"
+    identifier: "Lamilagrosa",
+    password: "1994"
   },
   {
     id: "camionero",
