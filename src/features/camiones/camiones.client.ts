@@ -208,12 +208,24 @@ export type CamionesMyTrip = {
   withTrailer: boolean;
   confirmed: boolean;
   share: number | null;
+  done: boolean;
   paid: boolean;
 };
 
 export async function listMyCamionesTrips() {
   const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/camiones/trips/mine`);
   return readJson<{ items: CamionesMyTrip[] }>(response);
+}
+
+// El camionero avisa que termino el viaje; el admin tambien puede marcarlo.
+export async function finishMyCamionesTrip(tripId: number) {
+  const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/camiones/trips/${tripId}/finish-mine`, { method: "POST" });
+  return readJson<{ ok: true }>(response);
+}
+
+export async function finishCamionesTrip(tripId: number) {
+  const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/camiones/trips/${tripId}/finish`, { method: "POST" });
+  return readJson<{ ok: true }>(response);
 }
 
 // El admin le paga al camionero: sus viajes valorados quedan como pagados.

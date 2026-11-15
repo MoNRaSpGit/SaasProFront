@@ -26,6 +26,7 @@ export type CamionesTrip = {
   createdByName?: string | null;
   createdByIsDriver?: boolean;
   driverPaidAt?: string | null;
+  driverDoneAt?: string | null;
   tripDate: string;
   place: string;
   truck: CamionesTruck | null;

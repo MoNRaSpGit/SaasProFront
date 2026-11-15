@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import { ModelUserMenu } from "../../shared/components/ModelUserMenu";
-import { listCamionesClients, listCamionesPlaces, listMyCamionesTrips, submitCamionesDriverTrip, type CamionesMyTrip } from "./camiones.client";
+import { listCamionesClients, listCamionesPlaces, listMyCamionesTrips, submitCamionesDriverTrip, finishMyCamionesTrip, type CamionesMyTrip } from "./camiones.client";
 import type { CamionesClient, CamionesPlace, CamionesTruck } from "./camiones.types";
 
 // Pantalla del CAMIONERO (rehecha 15/11/2026, mismo formato que la del
@@ -69,6 +69,16 @@ export function CamionesDriverPage() {
 
   const confirmedTrips = useMemo(() => myTrips.filter((trip) => trip.confirmed), [myTrips]);
   const sentTrips = useMemo(() => myTrips.filter((trip) => !trip.confirmed), [myTrips]);
+
+  async function handleFinish(tripId: number) {
+    try {
+      await finishMyCamionesTrip(tripId);
+      toast.success("Listo, avisaste que terminaste ✔");
+      void loadMine();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo avisar");
+    }
+  }
 
   function selectClient(item: CamionesClient) {
     setClient(item);
@@ -236,7 +246,7 @@ export function CamionesDriverPage() {
               <h3 style={subtitleStyle}>Confirmados</h3>
               {confirmedTrips.length === 0 ? <div style={emptyBoxStyle}>Todavía no tenés viajes confirmados.</div> : null}
               {confirmedTrips.slice(0, 30).map((trip) => (
-                <TripCard key={trip.id} trip={trip} />
+                <TripCard key={trip.id} trip={trip} onFinish={() => void handleFinish(trip.id)} />
               ))}
 
               <h3 style={subtitleStyle}>Esperando confirmación</h3>
@@ -252,7 +262,7 @@ export function CamionesDriverPage() {
   );
 }
 
-function TripCard({ trip }: { trip: CamionesMyTrip }) {
+function TripCard({ trip, onFinish }: { trip: CamionesMyTrip; onFinish?: () => void }) {
   return (
     <article style={tripCardStyle}>
       <div style={tripCardTopRowStyle}>
@@ -267,10 +277,15 @@ function TripCard({ trip }: { trip: CamionesMyTrip }) {
         {trip.withTrailer ? " · con zorra" : " · sin zorra"}
       </div>
       {trip.confirmed && trip.share !== null ? <div style={{ color: "#1f6b34", fontSize: 16, fontWeight: 800 }}>Te corresponde ${trip.share.toFixed(0)}</div> : null}
-      <div>
-        <span style={trip.paid ? paidBadgeStyle : trip.confirmed ? doneBadgeStyle : sentBadgeStyle}>
-          {trip.paid ? "Pagado" : trip.confirmed ? "Confirmado" : "Enviado"}
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <span style={trip.paid ? paidBadgeStyle : trip.done ? doneBadgeStyle : trip.confirmed ? approvedBadgeStyle : sentBadgeStyle}>
+          {trip.paid ? "Pagado" : trip.done ? "Terminado · esperando pago" : trip.confirmed ? "Aprobado · a hacer" : "Enviado"}
         </span>
+        {trip.confirmed && !trip.done && !trip.paid && onFinish ? (
+          <button type="button" onClick={onFinish} style={finishButtonStyle}>
+            Terminé el viaje
+          </button>
+        ) : null}
       </div>
     </article>
   );
@@ -308,4 +323,6 @@ const tripCardTopRowStyle: React.CSSProperties = { display: "flex", alignItems: 
 const badgeBase: React.CSSProperties = { fontSize: 12, fontWeight: 700, padding: "4px 10px", borderRadius: 999 };
 const sentBadgeStyle: React.CSSProperties = { ...badgeBase, background: "#fdecc8", color: "#7a5a12" };
 const doneBadgeStyle: React.CSSProperties = { ...badgeBase, background: "#d8f0dd", color: "#1f6b34" };
+const approvedBadgeStyle: React.CSSProperties = { ...badgeBase, background: "#fdecc8", color: "#7a5a12" };
+const finishButtonStyle: React.CSSProperties = { minHeight: 36, padding: "6px 14px", borderRadius: 999, border: "1px solid #1f6b34", background: "#e3f5e8", color: "#1f6b34", fontWeight: 800, fontSize: 14, cursor: "pointer" };
 const paidBadgeStyle: React.CSSProperties = { ...badgeBase, background: "#dbe7fb", color: "#1d4ea0" };

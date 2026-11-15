@@ -12,6 +12,7 @@ import {
   listCamionesPlaces,
   listCamionesTrips,
   payoutCamionesDriver,
+  finishCamionesTrip,
   updateCamionesClient,
   updateCamionesPlace,
   updateCamionesTrip
@@ -223,6 +224,7 @@ export function CamionesHomePage() {
   const trips = useMemo(() => allTrips.filter((trip) => trip.kilometers > 0), [allTrips]);
   const [payingDriver, setPayingDriver] = useState<number | null>(null);
   const [selectedDriver, setSelectedDriver] = useState<string | null>(null);
+  const [driverView, setDriverView] = useState<"choferes" | "historial">("choferes");
   // Pestaña "Camioneros": lo que cargó cada camionero, valorado o no.
   const driverGroups = useMemo(() => {
     const groups = new Map<string, CamionesTrip[]>();
@@ -1839,33 +1841,127 @@ export function CamionesHomePage() {
           <section style={panelStyle}>
             <div style={{ display: "grid", gap: 8 }}>
               <h2 style={{ margin: 0, fontSize: 24, color: "#2f241e" }}>Camioneros</h2>
-              <p style={{ margin: 0, color: "#68594f", lineHeight: 1.5 }}>Elegí un camionero para ver sus viajes: los que te mandó para aprobar y los ya aprobados.</p>
+              <p style={{ margin: 0, color: "#68594f", lineHeight: 1.5 }}>
+                Recorrido de cada viaje: te lo manda, lo aprobás, lo hace, avisa que terminó y vos le pagás. Lo pagado pasa al historial.
+              </p>
             </div>
+            <div style={{ ...filterWrapStyle, marginTop: 12 }}>
+              <button type="button" onClick={() => setDriverView("choferes")} style={driverView === "choferes" ? activeChipStyle : chipStyle}>
+                Choferes
+              </button>
+              <button type="button" onClick={() => setDriverView("historial")} style={driverView === "historial" ? activeChipStyle : chipStyle}>
+                Historial
+              </button>
+            </div>
+
             {tripsLoading && !tripsLoaded ? (
               <p style={{ margin: "16px 0 0", color: "#68594f" }}>Cargando...</p>
             ) : driverGroups.length === 0 ? (
               <p style={{ margin: "16px 0 0", color: "#68594f" }}>Todavía ningún camionero cargó viajes.</p>
+            ) : driverView === "historial" ? (
+              (() => {
+                // Pagos hechos: un renglon por camionero y fecha de pago.
+                const rows: Array<{ key: string; name: string; date: string; trips: CamionesTrip[]; amount: number }> = [];
+                for (const [driverName, list] of driverGroups) {
+                  const byDate = new Map<string, CamionesTrip[]>();
+                  for (const trip of list) {
+                    if (!trip.driverPaidAt) continue;
+                    byDate.set(trip.driverPaidAt, [...(byDate.get(trip.driverPaidAt) ?? []), trip]);
+                  }
+                  for (const [date, paidTrips] of byDate) {
+                    rows.push({
+                      key: driverName + date,
+                      name: driverName,
+                      date,
+                      trips: paidTrips,
+                      amount: paidTrips.reduce((sum, trip) => sum + ((getTripPricing(trip).totalAmount ?? 0) * DRIVER_PERCENT) / 100, 0)
+                    });
+                  }
+                }
+                rows.sort((x, y) => (x.date < y.date ? 1 : x.date > y.date ? -1 : 0));
+                const totalTrips = rows.reduce((sum, row) => sum + row.trips.length, 0);
+                const totalAmount = rows.reduce((sum, row) => sum + row.amount, 0);
+                return (
+                  <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
+                    <div style={filterTotalStyle}>
+                      <span style={tripTotalLabelStyle}>
+                        Pagado a camioneros · {totalTrips} viaje{totalTrips === 1 ? "" : "s"}
+                      </span>
+                      <strong style={tripMoneyStyle}>{formatMoneyLabel(totalAmount)}</strong>
+                    </div>
+                    {rows.length === 0 ? <p style={{ margin: 0, color: "#68594f" }}>Todavía no pagaste ningún viaje.</p> : null}
+                    {rows.map((row) => (
+                      <details key={row.key} style={{ ...tripCardStyle, border: "1px solid #b7c9e8", background: "linear-gradient(180deg, #f4f8fe 0%, #e4edfa 100%)" }}>
+                        <summary style={{ cursor: "pointer", display: "flex", justifyContent: "space-between", gap: 10, fontWeight: 700, color: "#2f241e" }}>
+                          <span>
+                            {row.name} · {formatDateLabel(row.date)}
+                            <span style={{ display: "block", color: "#68594f", fontSize: 13, fontWeight: 500 }}>
+                              {row.trips.length} viaje{row.trips.length === 1 ? "" : "s"}
+                            </span>
+                          </span>
+                          <span style={{ color: "#1d4ea0" }}>{formatMoneyLabel(row.amount)}</span>
+                        </summary>
+                        <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+                          {row.trips.map((trip) => {
+                            const route = getTripRouteParts(trip);
+                            return (
+                              <div key={trip.id} style={{ color: "#4c3d34", fontSize: 14, borderTop: "1px solid #d3deef", paddingTop: 8 }}>
+                                <strong>{trip.clientName}</strong> · {route.from} → {route.to}
+                                <div style={{ color: "#68594f", fontSize: 13 }}>
+                                  {formatDateLabel(trip.tripDate)} · {trip.truck === "mercedes" ? "Mercedes" : trip.truck === "volkswagen" ? "Volkswagen" : "—"} · {trip.kilometers} km · viaje{" "}
+                                  {formatMoneyLabel(getTripPricing(trip).totalAmount ?? 0)}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </details>
+                    ))}
+                  </div>
+                );
+              })()
             ) : (
               (() => {
                 const current = driverGroups.find(([name]) => name === selectedDriver) ?? driverGroups[0];
                 const [name, driverTrips] = current;
                 const toApprove = driverTrips.filter((trip) => trip.kilometers <= 0);
-                const approved = driverTrips.filter((trip) => trip.kilometers > 0);
-                const pendingPay = approved.filter((trip) => !trip.driverPaidAt);
-                const pendingAmount = pendingPay.reduce((sum, trip) => sum + ((getTripPricing(trip).totalAmount ?? 0) * DRIVER_PERCENT) / 100, 0);
+                const inProgress = driverTrips.filter((trip) => trip.kilometers > 0 && !trip.driverDoneAt && !trip.driverPaidAt);
+                const finished = driverTrips.filter((trip) => trip.kilometers > 0 && trip.driverDoneAt && !trip.driverPaidAt);
+                const pendingAmount = finished.reduce((sum, trip) => sum + ((getTripPricing(trip).totalAmount ?? 0) * DRIVER_PERCENT) / 100, 0);
                 const driverUserId = driverTrips[0].userId;
+                const cardBody = (trip: CamionesTrip) => {
+                  const meta = readTripMeta(trip.notes);
+                  const route = getTripRouteParts(trip);
+                  return (
+                    <>
+                      <div style={tripCardTopRowStyle}>
+                        <strong style={{ color: "#2f241e" }}>{trip.clientName}</strong>
+                        <span style={{ color: "#68594f", fontSize: 13 }}>{formatDateLabel(trip.tripDate)}</span>
+                      </div>
+                      <div style={{ color: "#2f241e" }}>
+                        {route.from} → {route.to}
+                      </div>
+                      <div style={{ color: "#68594f", fontSize: 14 }}>
+                        {trip.truck === "mercedes" ? "Mercedes" : trip.truck === "volkswagen" ? "Volkswagen" : "Camión sin asignar"}
+                        {meta.trailer === "si" ? " · con zorra" : meta.trailer === "no" ? " · sin zorra" : ""}
+                      </div>
+                      {trip.kilometers > 0 ? (
+                        <div style={{ color: "#1f6b34", fontSize: 14, fontWeight: 700 }}>
+                          {trip.kilometers} km · {formatMoneyLabel(getTripPricing(trip).totalAmount ?? 0)} · a pagarle{" "}
+                          {formatMoneyLabel(((getTripPricing(trip).totalAmount ?? 0) * DRIVER_PERCENT) / 100)}
+                        </div>
+                      ) : null}
+                      {meta.description ? <p style={tripDescriptionStyle}>{meta.description}</p> : null}
+                    </>
+                  );
+                };
                 return (
                   <div style={{ display: "grid", gap: 14, marginTop: 16 }}>
                     <div style={filterWrapStyle}>
                       {driverGroups.map(([driverName, list]) => {
                         const waiting = list.filter((trip) => trip.kilometers <= 0).length;
                         return (
-                          <button
-                            key={driverName}
-                            type="button"
-                            onClick={() => setSelectedDriver(driverName)}
-                            style={driverName === name ? activeChipStyle : chipStyle}
-                          >
+                          <button key={driverName} type="button" onClick={() => setSelectedDriver(driverName)} style={driverName === name ? activeChipStyle : chipStyle}>
                             {driverName}
                             {waiting > 0 ? ` (${waiting})` : ""}
                           </button>
@@ -1875,88 +1971,75 @@ export function CamionesHomePage() {
 
                     <h3 style={{ margin: 0, fontSize: 18, color: "#8a5a14" }}>Para aprobar ({toApprove.length})</h3>
                     {toApprove.length === 0 ? <p style={{ margin: 0, color: "#68594f" }}>No hay viajes esperando tu aprobación.</p> : null}
-                    {toApprove.map((trip) => {
-                      const meta = readTripMeta(trip.notes);
-                      const route = getTripRouteParts(trip);
-                      return (
-                        <article key={trip.id} style={{ ...tripCardStyle, border: "1px solid #e3c27a", background: "linear-gradient(180deg, #fff8e6 0%, #fdeec6 100%)" }}>
-                          <div style={tripCardTopRowStyle}>
-                            <strong style={{ color: "#2f241e" }}>{trip.clientName}</strong>
-                            <span style={{ color: "#68594f", fontSize: 13 }}>{formatDateLabel(trip.tripDate)}</span>
-                          </div>
-                          <div style={{ color: "#2f241e" }}>
-                            {route.from} → {route.to}
-                          </div>
-                          <div style={{ color: "#68594f", fontSize: 14 }}>
-                            {trip.truck === "mercedes" ? "Mercedes" : trip.truck === "volkswagen" ? "Volkswagen" : "Camión sin asignar"}
-                            {meta.trailer === "si" ? " · con zorra" : meta.trailer === "no" ? " · sin zorra" : ""}
-                          </div>
-                          {meta.description ? <p style={tripDescriptionStyle}>{meta.description}</p> : null}
-                          <div>
-                            <button type="button" onClick={() => openTripDetailsModal(trip)} style={miniActionButtonStyle}>
-                              Poner valor y aprobar
-                            </button>
-                          </div>
-                        </article>
-                      );
-                    })}
+                    {toApprove.map((trip) => (
+                      <article key={trip.id} style={{ ...tripCardStyle, border: "1px solid #e3c27a", background: "linear-gradient(180deg, #fff8e6 0%, #fdeec6 100%)" }}>
+                        {cardBody(trip)}
+                        <div>
+                          <button type="button" onClick={() => openTripDetailsModal(trip)} style={miniActionButtonStyle}>
+                            Poner valor y aprobar
+                          </button>
+                        </div>
+                      </article>
+                    ))}
 
-                    <h3 style={{ margin: "6px 0 0", fontSize: 18, color: "#1f6b34" }}>Aprobados ({approved.length})</h3>
-                    {approved.length > 0 ? (
-                      <div style={filterTotalStyle}>
-                        <span style={tripTotalLabelStyle}>
-                          A pagarle a {name} ({DRIVER_PERCENT}%) · {pendingPay.length} viaje{pendingPay.length === 1 ? "" : "s"}
-                        </span>
-                        <strong style={tripMoneyStyle}>{formatMoneyLabel(pendingAmount)}</strong>
-                        {pendingPay.length > 0 ? (
+                    <h3 style={{ margin: "6px 0 0", fontSize: 18, color: "#1f6b34" }}>Aprobados · en curso ({inProgress.length})</h3>
+                    {inProgress.length === 0 ? <p style={{ margin: 0, color: "#68594f" }}>Ningún viaje en curso.</p> : null}
+                    {inProgress.map((trip) => (
+                      <article key={trip.id} style={{ ...tripCardStyle, border: "1px solid #b9d9c1", background: "linear-gradient(180deg, #f7fcf8 0%, #e9f6ec 100%)" }}>
+                        {cardBody(trip)}
+                        <div>
                           <button
                             type="button"
-                            disabled={payingDriver === driverUserId}
                             style={miniActionButtonStyle}
-                            onClick={() => {
-                              if (!window.confirm(`¿Marcar como pagado a ${name}? Son ${formatMoneyLabel(pendingAmount)} por ${pendingPay.length} viaje(s).`)) return;
-                              setPayingDriver(driverUserId);
-                              void payoutCamionesDriver(driverUserId)
-                                .then(() => toast.success("Pago registrado ✔"))
-                                .catch(() => toast.error("No se pudo registrar el pago"))
-                                .finally(() => {
-                                  setPayingDriver(null);
+                            onClick={() =>
+                              void finishCamionesTrip(trip.id)
+                                .then(() => {
+                                  toast.success("Viaje marcado como terminado");
                                   void refreshTrips();
-                                });
-                            }}
+                                })
+                                .catch(() => toast.error("No se pudo marcar terminado"))
+                            }
                           >
-                            Marcar pagado
+                            Marcar terminado
                           </button>
-                        ) : null}
+                        </div>
+                      </article>
+                    ))}
+
+                    <h3 style={{ margin: "6px 0 0", fontSize: 18, color: "#1f6b34" }}>Terminados · para pagar ({finished.length})</h3>
+                    {finished.length > 0 ? (
+                      <div style={filterTotalStyle}>
+                        <span style={tripTotalLabelStyle}>
+                          A pagarle a {name} ({DRIVER_PERCENT}%) · {finished.length} viaje{finished.length === 1 ? "" : "s"}
+                        </span>
+                        <strong style={tripMoneyStyle}>{formatMoneyLabel(pendingAmount)}</strong>
+                        <button
+                          type="button"
+                          disabled={payingDriver === driverUserId}
+                          style={miniActionButtonStyle}
+                          onClick={() => {
+                            if (!window.confirm(`¿Marcar como pagado a ${name}? Son ${formatMoneyLabel(pendingAmount)} por ${finished.length} viaje(s).`)) return;
+                            setPayingDriver(driverUserId);
+                            void payoutCamionesDriver(driverUserId)
+                              .then(() => toast.success("Pago registrado ✔ (pasó al historial)"))
+                              .catch(() => toast.error("No se pudo registrar el pago"))
+                              .finally(() => {
+                                setPayingDriver(null);
+                                void refreshTrips();
+                              });
+                          }}
+                        >
+                          Pagar
+                        </button>
                       </div>
                     ) : (
-                      <p style={{ margin: 0, color: "#68594f" }}>Todavía no aprobaste ningún viaje.</p>
+                      <p style={{ margin: 0, color: "#68594f" }}>Nada para pagar por ahora.</p>
                     )}
-                    {approved.map((trip) => {
-                      const meta = readTripMeta(trip.notes);
-                      const route = getTripRouteParts(trip);
-                      const share = ((getTripPricing(trip).totalAmount ?? 0) * DRIVER_PERCENT) / 100;
-                      return (
-                        <article key={trip.id} style={{ ...tripCardStyle, border: "1px solid #9bd0a8", background: "linear-gradient(180deg, #f1fbf3 0%, #dff3e4 100%)" }}>
-                          <div style={tripCardTopRowStyle}>
-                            <strong style={{ color: "#2f241e" }}>{trip.clientName}</strong>
-                            <span style={{ color: "#68594f", fontSize: 13 }}>{formatDateLabel(trip.tripDate)}</span>
-                          </div>
-                          <div style={{ color: "#2f241e" }}>
-                            {route.from} → {route.to}
-                          </div>
-                          <div style={{ color: "#68594f", fontSize: 14 }}>
-                            {trip.truck === "mercedes" ? "Mercedes" : trip.truck === "volkswagen" ? "Volkswagen" : "Camión sin asignar"}
-                            {meta.trailer === "si" ? " · con zorra" : meta.trailer === "no" ? " · sin zorra" : ""}
-                          </div>
-                          <div style={{ color: "#1f6b34", fontSize: 14, fontWeight: 700 }}>
-                            {trip.kilometers} km{meta.totalAmount !== null || getTripPricing(trip).totalAmount !== null ? ` · ${formatMoneyLabel(getTripPricing(trip).totalAmount ?? 0)}` : ""}
-                            {trip.driverPaidAt ? ` · pagado ${formatDateLabel(trip.driverPaidAt)}` : ` · a pagarle ${formatMoneyLabel(share)}`}
-                          </div>
-                          {meta.description ? <p style={tripDescriptionStyle}>{meta.description}</p> : null}
-                        </article>
-                      );
-                    })}
+                    {finished.map((trip) => (
+                      <article key={trip.id} style={{ ...tripCardStyle, border: "1px solid #7fc08f", background: "linear-gradient(180deg, #e9f8ed 0%, #cdeed6 100%)" }}>
+                        {cardBody(trip)}
+                      </article>
+                    ))}
                   </div>
                 );
               })()
