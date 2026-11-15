@@ -8,7 +8,8 @@ import { ExpandableList } from "./ExpandableList";
 // Pantalla del CAMIONERO (rehecha 15/11/2026, mismo formato que la del
 // administrador): pestañas Cliente -> Viaje -> Mis viajes. Elige el cliente,
 // despues en el viaje carga origen, destino, camion y zorra. NO puede poner
-// kilometros ni valor: eso lo hace el administrador (La Milagrosa).
+// el valor: eso lo hace el administrador (La Milagrosa). Los kilometros SI
+// los pone el camionero (15/11/2026).
 
 type DriverTab = "cliente" | "viaje" | "mis";
 type HistoryView = "pendientes" | "pagados";
@@ -40,6 +41,7 @@ export function CamionesDriverPage() {
   const [fromPlace, setFromPlace] = useState("");
   const [toPlace, setToPlace] = useState("");
   const [tripDate, setTripDate] = useState(today());
+  const [kilometers, setKilometers] = useState("");
   const [description, setDescription] = useState("");
   const [sending, setSending] = useState(false);
 
@@ -99,6 +101,8 @@ export function CamionesDriverPage() {
     if (!toPlace.trim()) return toast.error("Falta el destino");
     if (!truck) return toast.error("Elegí el camión");
     if (withTrailer === null) return toast.error("Decí si fue con zorra o sin zorra");
+    const kmValue = Number(kilometers.replace(",", "."));
+    if (!Number.isFinite(kmValue) || kmValue <= 0) return toast.error("Poné los kilómetros del viaje");
 
     setSending(true);
     try {
@@ -106,6 +110,7 @@ export function CamionesDriverPage() {
         clientId: client.id,
         truck,
         withTrailer,
+        kilometers: kmValue,
         tripDate,
         fromPlaceName: fromPlace.trim(),
         placeName: toPlace.trim(),
@@ -118,6 +123,7 @@ export function CamionesDriverPage() {
       setFromPlace("");
       setToPlace("");
       setDescription("");
+      setKilometers("");
       setWithTrailer(null);
       setTripDate(today());
       void loadMine();
@@ -229,6 +235,11 @@ export function CamionesDriverPage() {
                   </button>
                 </div>
               </div>
+
+              <label style={fieldWrapStyle}>
+                <span style={fieldLabelStyle}>Kilómetros</span>
+                <input style={inputStyle} type="number" inputMode="decimal" min="0" step="0.1" value={kilometers} onChange={(event) => setKilometers(event.target.value)} placeholder="Ej: 180" />
+              </label>
 
               <label style={fieldWrapStyle}>
                 <span style={fieldLabelStyle}>Fecha</span>

@@ -222,7 +222,10 @@ export function CamionesHomePage() {
   // Los viajes que cargan los camioneros llegan con 0 km y sin valor ("por
   // valorar"): no entran a Pagos / Panel / Mes hasta que el administrador
   // les pone km y valor.
-  const trips = useMemo(() => allTrips.filter((trip) => trip.kilometers > 0), [allTrips]);
+  // Un viaje de camionero esta APROBADO cuando el administrador le puso
+  // valor (los km ya los trae el camionero). Los demas viajes: como siempre.
+  const isApproved = (trip: CamionesTrip) => (trip.createdByIsDriver ? getTripPricing(trip).totalAmount !== null : trip.kilometers > 0);
+  const trips = useMemo(() => allTrips.filter((trip) => isApproved(trip)), [allTrips]);
   const [payingDriver, setPayingDriver] = useState<number | null>(null);
   // Modal propio para confirmar el pago al camionero (en vez del confirm de Windows).
   const [payConfirm, setPayConfirm] = useState<{ userId: number; name: string; amount: number; trips: CamionesTrip[] } | null>(null);
@@ -239,7 +242,7 @@ export function CamionesHomePage() {
     return Array.from(groups.entries());
   }, [allTrips]);
   const unvaluedTrips = useMemo(
-    () => allTrips.filter((trip) => trip.kilometers <= 0 && trip.status !== "cancelled"),
+    () => allTrips.filter((trip) => trip.createdByIsDriver && !isApproved(trip) && trip.status !== "cancelled"),
     [allTrips]
   );
   const [clientSearch, setClientSearch] = useState("");
@@ -1883,7 +1886,7 @@ export function CamionesHomePage() {
             </div>
             <div style={{ ...filterWrapStyle, marginTop: 12 }}>
               {driverGroups.map(([driverName, list]) => {
-                const waiting = list.filter((trip) => trip.kilometers <= 0).length;
+                const waiting = list.filter((trip) => !isApproved(trip)).length;
                 const isActive = driverView === "choferes" && (selectedDriver ?? driverGroups[0][0]) === driverName;
                 return (
                   <button
@@ -2017,9 +2020,9 @@ export function CamionesHomePage() {
               (() => {
                 const current = driverGroups.find(([name]) => name === selectedDriver) ?? driverGroups[0];
                 const [name, driverTrips] = current;
-                const toApprove = driverTrips.filter((trip) => trip.kilometers <= 0);
-                const inProgress = driverTrips.filter((trip) => trip.kilometers > 0 && !trip.driverDoneAt && !trip.driverPaidAt);
-                const finished = driverTrips.filter((trip) => trip.kilometers > 0 && trip.driverDoneAt && !trip.driverPaidAt);
+                const toApprove = driverTrips.filter((trip) => !isApproved(trip));
+                const inProgress = driverTrips.filter((trip) => isApproved(trip) && !trip.driverDoneAt && !trip.driverPaidAt);
+                const finished = driverTrips.filter((trip) => isApproved(trip) && trip.driverDoneAt && !trip.driverPaidAt);
                 const pendingAmount = finished.reduce((sum, trip) => sum + ((getTripPricing(trip).totalAmount ?? 0) * DRIVER_PERCENT) / 100, 0);
                 const driverUserId = driverTrips[0].userId;
                 const cardBody = (trip: CamionesTrip) => {
@@ -2038,7 +2041,7 @@ export function CamionesHomePage() {
                         {trip.truck === "mercedes" ? "Mercedes" : trip.truck === "volkswagen" ? "Volkswagen" : "Camión sin asignar"}
                         {meta.trailer === "si" ? " · con zorra" : meta.trailer === "no" ? " · sin zorra" : ""}
                       </div>
-                      {trip.kilometers > 0 ? (
+                      {isApproved(trip) ? (
                         <div style={{ color: "#1f6b34", fontSize: 14, fontWeight: 700 }}>
                           {trip.kilometers} km · {formatMoneyLabel(getTripPricing(trip).totalAmount ?? 0)} · a pagarle{" "}
                           {formatMoneyLabel(((getTripPricing(trip).totalAmount ?? 0) * DRIVER_PERCENT) / 100)}

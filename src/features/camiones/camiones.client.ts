@@ -184,6 +184,7 @@ export async function submitCamionesDriverTrip(payload: {
   clientId: number;
   truck: CamionesTruck;
   withTrailer: boolean;
+  kilometers: number;
   tripDate: string;
   fromPlaceName: string;
   placeName: string;
