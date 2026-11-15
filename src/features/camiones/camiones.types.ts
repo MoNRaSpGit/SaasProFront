@@ -25,6 +25,7 @@ export type CamionesTrip = {
   // Quien cargo el viaje (solo lo trae el listado del administrador).
   createdByName?: string | null;
   createdByIsDriver?: boolean;
+  driverPaidAt?: string | null;
   tripDate: string;
   place: string;
   truck: CamionesTruck | null;

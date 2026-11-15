@@ -11,6 +11,7 @@ import {
   listCamionesClients,
   listCamionesPlaces,
   listCamionesTrips,
+  payoutCamionesDriver,
   updateCamionesClient,
   updateCamionesPlace,
   updateCamionesTrip
@@ -25,6 +26,8 @@ type TripModalState = { tripId: number } | null;
 type TripDeleteConfirmState = { tripId: number; clientName: string; placeName: string } | null;
 type TripFilter = "all" | "pending" | "paid";
 type RouteField = "from" | "to";
+// Porcentaje del camionero sobre lo facturado (igual que en la pestaña Mes).
+const DRIVER_PERCENT = 10;
 const ROUTE_FROM_PREFIX = "route-from::";
 const RATE_PER_KM_PREFIX = "rate-per-km::";
 const TOTAL_AMOUNT_PREFIX = "trip-total::";
@@ -218,6 +221,7 @@ export function CamionesHomePage() {
   // valorar"): no entran a Pagos / Panel / Mes hasta que el administrador
   // les pone km y valor.
   const trips = useMemo(() => allTrips.filter((trip) => trip.kilometers > 0), [allTrips]);
+  const [payingDriver, setPayingDriver] = useState<number | null>(null);
   // Pestaña "Camioneros": lo que cargó cada camionero, valorado o no.
   const driverGroups = useMemo(() => {
     const groups = new Map<string, CamionesTrip[]>();
@@ -1849,11 +1853,39 @@ export function CamionesHomePage() {
               ) : driverGroups.length === 0 ? (
                 <p style={{ margin: 0, color: "#68594f" }}>Todavía ningún camionero cargó viajes.</p>
               ) : (
-                driverGroups.map(([name, driverTrips]) => (
+                driverGroups.map(([name, driverTrips]) => {
+                  const pendingPay = driverTrips.filter((trip) => trip.kilometers > 0 && !trip.driverPaidAt);
+                  const pendingAmount = pendingPay.reduce((sum, trip) => sum + ((getTripPricing(trip).totalAmount ?? 0) * DRIVER_PERCENT) / 100, 0);
+                  const driverUserId = driverTrips[0].userId;
+                  return (
                   <div key={name} style={{ display: "grid", gap: 10 }}>
                     <h3 style={{ margin: 0, fontSize: 19, color: "#2f241e" }}>
                       {name} <span style={{ color: "#68594f", fontSize: 14, fontWeight: 500 }}>· {driverTrips.length} viaje{driverTrips.length === 1 ? "" : "s"}</span>
                     </h3>
+                    <div style={filterTotalStyle}>
+                      <span style={tripTotalLabelStyle}>A pagarle ({DRIVER_PERCENT}%) · {pendingPay.length} viaje{pendingPay.length === 1 ? "" : "s"}</span>
+                      <strong style={tripMoneyStyle}>{formatMoneyLabel(pendingAmount)}</strong>
+                      {pendingPay.length > 0 ? (
+                        <button
+                          type="button"
+                          disabled={payingDriver === driverUserId}
+                          style={miniActionButtonStyle}
+                          onClick={() => {
+                            if (!window.confirm(`¿Marcar como pagado a ${name}? Son ${formatMoneyLabel(pendingAmount)} por ${pendingPay.length} viaje(s).`)) return;
+                            setPayingDriver(driverUserId);
+                            void payoutCamionesDriver(driverUserId)
+                              .then(() => toast.success("Pago registrado ✔"))
+                              .catch(() => toast.error("No se pudo registrar el pago"))
+                              .finally(() => {
+                                setPayingDriver(null);
+                                void refreshTrips();
+                              });
+                          }}
+                        >
+                          Marcar pagado
+                        </button>
+                      ) : null}
+                    </div>
                     {driverTrips.map((trip) => {
                       const meta = readTripMeta(trip.notes);
                       const route = getTripRouteParts(trip);
@@ -1875,6 +1907,7 @@ export function CamionesHomePage() {
                             {valued
                               ? `${trip.kilometers} km${meta.totalAmount !== null ? ` · ${formatMoneyLabel(meta.totalAmount)}` : ""}`
                               : "Por valorar"}
+                            {valued ? (trip.driverPaidAt ? ` · pagado ${formatDateLabel(trip.driverPaidAt)}` : ` · a pagarle ${formatMoneyLabel(((getTripPricing(trip).totalAmount ?? 0) * DRIVER_PERCENT) / 100)}`) : ""}
                           </div>
                           {meta.description ? <p style={tripDescriptionStyle}>{meta.description}</p> : null}
                           {!valued ? (
@@ -1888,7 +1921,8 @@ export function CamionesHomePage() {
                       );
                     })}
                   </div>
-                ))
+                  );
+                })
               )}
             </div>
           </section>

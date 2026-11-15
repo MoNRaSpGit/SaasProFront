@@ -198,7 +198,26 @@ export async function submitCamionesDriverTrip(payload: {
   return readJson<{ trip: CamionesTripsResponse["items"][number] }>(response);
 }
 
+export type CamionesMyTrip = {
+  id: number;
+  clientName: string;
+  from: string;
+  to: string;
+  tripDate: string;
+  truck: CamionesTruck | null;
+  withTrailer: boolean;
+  confirmed: boolean;
+  share: number | null;
+  paid: boolean;
+};
+
 export async function listMyCamionesTrips() {
   const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/camiones/trips/mine`);
-  return readJson<{ items: CamionesTripsResponse["items"] }>(response);
+  return readJson<{ items: CamionesMyTrip[] }>(response);
+}
+
+// El admin le paga al camionero: sus viajes valorados quedan como pagados.
+export async function payoutCamionesDriver(userId: number) {
+  const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/camiones/drivers/${userId}/payout`, { method: "POST" });
+  return readJson<{ paidTrips: number }>(response);
 }

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import { ModelUserMenu } from "../../shared/components/ModelUserMenu";
-import { listCamionesClients, listCamionesPlaces, listMyCamionesTrips, submitCamionesDriverTrip } from "./camiones.client";
-import type { CamionesClient, CamionesPlace, CamionesTrip, CamionesTruck } from "./camiones.types";
+import { listCamionesClients, listCamionesPlaces, listMyCamionesTrips, submitCamionesDriverTrip, type CamionesMyTrip } from "./camiones.client";
+import type { CamionesClient, CamionesPlace, CamionesTruck } from "./camiones.types";
 
 // Pantalla del CAMIONERO (14/11/2026): carga el viaje (camion, zorra, cliente,
 // origen y destino) y nada mas. No ve valores ni el resto de la app: el
@@ -18,15 +18,10 @@ function dateLabel(value: string) {
   return `${day}/${month}/${year}`;
 }
 
-function readNote(notes: string | null, prefix: string) {
-  const token = (notes ?? "").split("||").find((item) => item.trim().startsWith(prefix));
-  return token ? token.trim().slice(prefix.length).trim() : "";
-}
-
 export function CamionesDriverPage() {
   const [clients, setClients] = useState<CamionesClient[]>([]);
   const [places, setPlaces] = useState<CamionesPlace[]>([]);
-  const [myTrips, setMyTrips] = useState<CamionesTrip[]>([]);
+  const [myTrips, setMyTrips] = useState<CamionesMyTrip[]>([]);
   const [truck, setTruck] = useState<CamionesTruck | "">("");
   const [withTrailer, setWithTrailer] = useState<boolean | null>(null);
   const [clientSearch, setClientSearch] = useState("");
@@ -54,6 +49,9 @@ export function CamionesDriverPage() {
       .catch(() => undefined);
     void loadMine();
   }, [loadMine]);
+
+  const confirmedTrips = useMemo(() => myTrips.filter((trip) => trip.confirmed), [myTrips]);
+  const sentTrips = useMemo(() => myTrips.filter((trip) => !trip.confirmed), [myTrips]);
 
   const matches = useMemo(() => {
     const query = clientSearch.trim().toLowerCase();
@@ -173,28 +171,49 @@ export function CamionesDriverPage() {
         </section>
 
         <section style={cardStyle}>
-          <h2 style={titleStyle}>Mis últimos viajes</h2>
-          {myTrips.length === 0 ? (
-            <span style={{ color: "#68594f" }}>Todavía no cargaste viajes.</span>
+          <h2 style={titleStyle}>Viajes confirmados</h2>
+          {confirmedTrips.length === 0 ? (
+            <span style={{ color: "#68594f" }}>Todavía no tenés viajes confirmados.</span>
           ) : (
-            myTrips.slice(0, 10).map((trip) => {
-              const zorra = readNote(trip.notes, "zorra::");
-              return (
-                <div key={trip.id} style={tripRowStyle}>
-                  <div>
-                    <strong>{trip.clientName}</strong>
-                    <div style={{ color: "#68594f", fontSize: 14 }}>
-                      {readNote(trip.notes, "route-from::") || "?"} → {trip.place}
-                    </div>
-                    <div style={{ color: "#68594f", fontSize: 13 }}>
-                      {dateLabel(trip.tripDate)} · {trip.truck === "mercedes" ? "Mercedes" : trip.truck === "volkswagen" ? "Volkswagen" : "—"}
-                      {zorra === "si" ? " · con zorra" : zorra === "no" ? " · sin zorra" : ""}
-                    </div>
+            confirmedTrips.slice(0, 20).map((trip) => (
+              <div key={trip.id} style={tripRowStyle}>
+                <div>
+                  <strong>{trip.clientName}</strong>
+                  <div style={{ color: "#68594f", fontSize: 14 }}>
+                    {trip.from || "?"} → {trip.to}
                   </div>
-                  <span style={trip.kilometers > 0 ? doneStyle : sentStyle}>{trip.kilometers > 0 ? "Valorado" : "Enviado"}</span>
+                  <div style={{ color: "#68594f", fontSize: 13 }}>
+                    {dateLabel(trip.tripDate)} · {trip.truck === "mercedes" ? "Mercedes" : trip.truck === "volkswagen" ? "Volkswagen" : "—"}
+                    {trip.withTrailer ? " · con zorra" : " · sin zorra"}
+                  </div>
+                  {trip.share !== null ? <div style={{ color: "#1f6b34", fontSize: 15, fontWeight: 700 }}>Te corresponde ${trip.share.toFixed(0)}</div> : null}
                 </div>
-              );
-            })
+                <span style={trip.paid ? paidStyle : doneStyle}>{trip.paid ? "Pagado" : "Confirmado"}</span>
+              </div>
+            ))
+          )}
+        </section>
+
+        <section style={cardStyle}>
+          <h2 style={titleStyle}>Esperando confirmación</h2>
+          {sentTrips.length === 0 ? (
+            <span style={{ color: "#68594f" }}>No tenés viajes esperando.</span>
+          ) : (
+            sentTrips.slice(0, 10).map((trip) => (
+              <div key={trip.id} style={tripRowStyle}>
+                <div>
+                  <strong>{trip.clientName}</strong>
+                  <div style={{ color: "#68594f", fontSize: 14 }}>
+                    {trip.from || "?"} → {trip.to}
+                  </div>
+                  <div style={{ color: "#68594f", fontSize: 13 }}>
+                    {dateLabel(trip.tripDate)} · {trip.truck === "mercedes" ? "Mercedes" : trip.truck === "volkswagen" ? "Volkswagen" : "—"}
+                    {trip.withTrailer ? " · con zorra" : " · sin zorra"}
+                  </div>
+                </div>
+                <span style={sentStyle}>Enviado</span>
+              </div>
+            ))
           )}
         </section>
       </div>
@@ -222,4 +241,5 @@ const linkButtonStyle: React.CSSProperties = { background: "transparent", border
 const sendStyle: React.CSSProperties = { marginTop: 8, padding: "16px", borderRadius: 16, border: "none", background: "#38281f", color: "#fbf5ec", fontSize: 18, fontWeight: 700, cursor: "pointer" };
 const tripRowStyle: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, padding: "10px 0", borderTop: "1px solid #eadfd1" };
 const sentStyle: React.CSSProperties = { fontSize: 12, fontWeight: 700, padding: "4px 10px", borderRadius: 999, background: "#fdecc8", color: "#7a5a12" };
+const paidStyle: React.CSSProperties = { fontSize: 12, fontWeight: 700, padding: "4px 10px", borderRadius: 999, background: "#dbe7fb", color: "#1d4ea0" };
 const doneStyle: React.CSSProperties = { ...sentStyle, background: "#d8f0dd", color: "#1f6b34" };
