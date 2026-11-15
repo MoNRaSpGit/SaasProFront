@@ -1905,65 +1905,89 @@ export function CamionesHomePage() {
               <p style={{ margin: "16px 0 0", color: "#68594f" }}>Todavía ningún camionero cargó viajes.</p>
             ) : driverView === "historial" ? (
               (() => {
-                // Pagos hechos: un renglon por camionero y fecha de pago.
-                const rows: Array<{ key: string; name: string; date: string; trips: CamionesTrip[]; amount: number }> = [];
+                // Cada viaje pagado va por separado (15/11/2026, pedido explicito):
+                // "viaje 1: 1000, viaje 2: 2000", sin acumular. Lo acumulado va
+                // solo en el resumen por mes de arriba.
+                const share = (trip: CamionesTrip) => ((getTripPricing(trip).totalAmount ?? 0) * DRIVER_PERCENT) / 100;
+                type PaidRow = { trip: CamionesTrip; driver: string; number: number; amount: number };
+                const paidRows: PaidRow[] = [];
                 for (const [driverName, list] of driverGroups) {
-                  const byDate = new Map<string, CamionesTrip[]>();
-                  for (const trip of list) {
-                    if (!trip.driverPaidAt) continue;
-                    byDate.set(trip.driverPaidAt, [...(byDate.get(trip.driverPaidAt) ?? []), trip]);
-                  }
-                  for (const [date, paidTrips] of byDate) {
-                    rows.push({
-                      key: driverName + date,
-                      name: driverName,
-                      date,
-                      trips: paidTrips,
-                      amount: paidTrips.reduce((sum, trip) => sum + ((getTripPricing(trip).totalAmount ?? 0) * DRIVER_PERCENT) / 100, 0)
-                    });
-                  }
+                  // Numero de viaje de cada camionero: del mas viejo al mas nuevo.
+                  const paidSorted = list
+                    .filter((trip) => trip.driverPaidAt)
+                    .sort((x, y) => (x.tripDate === y.tripDate ? x.id - y.id : x.tripDate < y.tripDate ? -1 : 1));
+                  paidSorted.forEach((trip, index) => paidRows.push({ trip, driver: driverName, number: index + 1, amount: share(trip) }));
                 }
-                rows.sort((x, y) => (x.date < y.date ? 1 : x.date > y.date ? -1 : 0));
-                const totalTrips = rows.reduce((sum, row) => sum + row.trips.length, 0);
-                const totalAmount = rows.reduce((sum, row) => sum + row.amount, 0);
+                // Los mas recientes primero (por fecha de pago, despues por id).
+                paidRows.sort((x, y) => {
+                  const dx = x.trip.driverPaidAt ?? "";
+                  const dy = y.trip.driverPaidAt ?? "";
+                  return dx === dy ? y.trip.id - x.trip.id : dx < dy ? 1 : -1;
+                });
+                // Resumen por mes y camionero (segun fecha de pago).
+                const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+                const months = new Map<string, Map<string, { trips: number; amount: number }>>();
+                for (const row of paidRows) {
+                  const monthKey = (row.trip.driverPaidAt ?? "").slice(0, 7);
+                  const perDriver = months.get(monthKey) ?? new Map<string, { trips: number; amount: number }>();
+                  const current = perDriver.get(row.driver) ?? { trips: 0, amount: 0 };
+                  perDriver.set(row.driver, { trips: current.trips + 1, amount: current.amount + row.amount });
+                  months.set(monthKey, perDriver);
+                }
+                const monthRows = Array.from(months.entries()).sort((x, y) => (x[0] < y[0] ? 1 : -1));
                 return (
                   <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
-                    <div style={filterTotalStyle}>
-                      <span style={tripTotalLabelStyle}>
-                        Pagado a camioneros · {totalTrips} viaje{totalTrips === 1 ? "" : "s"}
-                      </span>
-                      <strong style={tripMoneyStyle}>{formatMoneyLabel(totalAmount)}</strong>
-                    </div>
-                    {rows.length === 0 ? <p style={{ margin: 0, color: "#68594f" }}>Todavía no pagaste ningún viaje.</p> : null}
+                    <h3 style={{ margin: 0, fontSize: 18, color: "#1d4ea0" }}>Pagado por mes</h3>
+                    {monthRows.length === 0 ? <p style={{ margin: 0, color: "#68594f" }}>Todavía no pagaste ningún viaje.</p> : null}
                     <ExpandableList
-                      items={rows}
-                      render={(row) => (
-                      <details key={row.key} style={{ ...tripCardStyle, border: "1px solid #b7c9e8", background: "linear-gradient(180deg, #f4f8fe 0%, #e4edfa 100%)" }}>
-                        <summary style={{ cursor: "pointer", display: "flex", justifyContent: "space-between", gap: 10, fontWeight: 700, color: "#2f241e" }}>
-                          <span>
-                            {row.name} · {formatDateLabel(row.date)}
-                            <span style={{ display: "block", color: "#68594f", fontSize: 13, fontWeight: 500 }}>
-                              {row.trips.length} viaje{row.trips.length === 1 ? "" : "s"}
-                            </span>
-                          </span>
-                          <span style={{ color: "#1d4ea0" }}>{formatMoneyLabel(row.amount)}</span>
-                        </summary>
-                        <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
-                          {row.trips.map((trip) => {
-                            const route = getTripRouteParts(trip);
-                            return (
-                              <div key={trip.id} style={{ color: "#4c3d34", fontSize: 14, borderTop: "1px solid #d3deef", paddingTop: 8 }}>
-                                <strong>{trip.clientName}</strong> · {route.from} → {route.to}
-                                <div style={{ color: "#68594f", fontSize: 13 }}>
-                                  {formatDateLabel(trip.tripDate)} · {trip.truck === "mercedes" ? "Mercedes" : trip.truck === "volkswagen" ? "Volkswagen" : "—"} · {trip.kilometers} km · viaje{" "}
-                                  {formatMoneyLabel(getTripPricing(trip).totalAmount ?? 0)}
-                                </div>
+                      items={monthRows}
+                      render={([monthKey, perDriver]) => {
+                        const [year, month] = monthKey.split("-");
+                        const total = Array.from(perDriver.values()).reduce((sum, item) => sum + item.amount, 0);
+                        return (
+                          <article key={monthKey} style={{ ...tripCardStyle, border: "1px solid #b7c9e8", background: "linear-gradient(180deg, #f4f8fe 0%, #e4edfa 100%)" }}>
+                            <div style={tripCardTopRowStyle}>
+                              <strong style={{ color: "#2f241e" }}>
+                                {monthNames[Number(month) - 1] ?? month} {year}
+                              </strong>
+                              <strong style={{ color: "#1d4ea0" }}>{formatMoneyLabel(total)}</strong>
+                            </div>
+                            {Array.from(perDriver.entries()).map(([driverName, item]) => (
+                              <div key={driverName} style={{ display: "flex", justifyContent: "space-between", color: "#4c3d34", fontSize: 14 }}>
+                                <span>
+                                  {driverName} · {item.trips} viaje{item.trips === 1 ? "" : "s"}
+                                </span>
+                                <span>{formatMoneyLabel(item.amount)}</span>
                               </div>
-                            );
-                          })}
-                        </div>
-                      </details>
-                      )}
+                            ))}
+                          </article>
+                        );
+                      }}
+                    />
+
+                    <h3 style={{ margin: "8px 0 0", fontSize: 18, color: "#1d4ea0" }}>Viajes pagados</h3>
+                    <ExpandableList
+                      items={paidRows}
+                      render={(row) => {
+                        const route = getTripRouteParts(row.trip);
+                        return (
+                          <article key={row.trip.id} style={{ ...tripCardStyle, border: "1px solid #b7c9e8", background: "linear-gradient(180deg, #f4f8fe 0%, #e4edfa 100%)" }}>
+                            <div style={tripCardTopRowStyle}>
+                              <strong style={{ color: "#2f241e" }}>
+                                {row.driver} · Viaje {row.number}
+                              </strong>
+                              <strong style={{ color: "#1d4ea0" }}>{formatMoneyLabel(row.amount)}</strong>
+                            </div>
+                            <div style={{ color: "#2f241e" }}>
+                              {row.trip.clientName} · {route.from} → {route.to}
+                            </div>
+                            <div style={{ color: "#68594f", fontSize: 13 }}>
+                              {formatDateLabel(row.trip.tripDate)} · {row.trip.truck === "mercedes" ? "Mercedes" : row.trip.truck === "volkswagen" ? "Volkswagen" : "—"} · {row.trip.kilometers} km · pagado el{" "}
+                              {formatDateLabel(row.trip.driverPaidAt ?? "")}
+                            </div>
+                          </article>
+                        );
+                      }}
                     />
                   </div>
                 );
