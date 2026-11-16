@@ -3,7 +3,6 @@ import { DashboardPage } from "../features/auth/DashboardPage";
 import { CamionesEntry } from "../features/camiones/CamionesEntry";
 import { LoginPage } from "../features/auth/LoginPage";
 import { ProtectedRoute } from "../features/auth/ProtectedRoute";
-import { RegisterPage } from "../features/auth/RegisterPage";
 import { SaasAdminHomePage } from "../features/saas-admin/SaasAdminHomePage";
 
 function HealthPage() {
@@ -19,7 +18,6 @@ export function App() {
     <Routes>
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
       <Route
         path="/dashboard"
         element={
