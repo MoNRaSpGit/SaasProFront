@@ -63,7 +63,7 @@ export async function refreshSession(): Promise<AuthTokens | null> {
   if (!refreshToken) return null;
   const currentUser = getStoredUser();
 
-  const response = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
+  const response = await fetch(`${API_BASE_URL}/api/v1/camiones/auth/refresh`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ refreshToken })
@@ -83,7 +83,7 @@ export async function refreshSession(): Promise<AuthTokens | null> {
 export async function logoutSession() {
   const refreshToken = getRefreshToken();
   if (refreshToken) {
-    await fetch(`${API_BASE_URL}/api/v1/auth/logout`, {
+    await fetch(`${API_BASE_URL}/api/v1/camiones/auth/logout`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ refreshToken })

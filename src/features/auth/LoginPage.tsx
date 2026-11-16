@@ -20,13 +20,13 @@ const QUICK_ACCESS_ACCOUNTS: QuickAccessAccount[] = [
   {
     id: "rodrigo",
     label: "Entrar como Rodrigo",
-    identifier: "ejemplo-julio@saaspro.local",
+    identifier: "rodrigo",
     password: "ejemplo1234"
   },
   {
     id: "gabriel",
     label: "Entrar como Gabriel",
-    identifier: "ejemplo-marcos@saaspro.local",
+    identifier: "gabriel",
     password: "ejemplo1234"
   }
 ];
@@ -43,7 +43,7 @@ export function LoginPage() {
   const loginPromisesRef = useRef<Record<string, Promise<LoginResponse> | null>>({});
 
   const performLoginRequest = useCallback(async (credentials: { identifier: string; password: string }) => {
-    const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/camiones/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
